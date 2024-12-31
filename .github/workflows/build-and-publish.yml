@@ -1,0 +1,48 @@
+name: Build and Publish Shared Library to GitHub Packages
+
+on:
+  push:
+    tags:
+      - '*.*.*' # Trigger this on tag pushes
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up the environment (install dependencies)
+      - name: Install Build Tools
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential
+
+      # Step 3: Build the shared library
+      - name: Build Shared Library
+        run: |
+          rm -rfv ./build
+          mkdir ./build
+          gcc -c ./s_buffer.c -o ./build/s_buffer.o -fPIC -v
+          gcc -shared ./build/s_buffer.o -o ./build/libsbuffer.so -v
+          rm -rfv ./s_buffer.o
+
+      # Step 4: Upload the built shared library as an artifact
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libsbuffer
+          path: ./build/libsbuffer.so
+
+      - name: Publish Shared Library to GitHub Packages
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GH_TOKEN }}" > ~/.npmrc
+
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "Version: $VERSION"
+
+          gh release create $VERSION ./build/libsbuffer.so --title "libsbuffer.so" --notes-from-tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}

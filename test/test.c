@@ -13,17 +13,13 @@
 int main ()
 {
     const byte_t A = 65;
-    sbuffer_t* sbuffer = SB_Init(6, 1024);
+    sbuffer_t* sbuffer = SB_Init(16, 4, 1024);
 
-    SB_Push(sbuffer, 5, 6, A);
-    SB_Push(sbuffer, 1, 2, A + 1);
-    SB_Push(sbuffer, 3, 4, A + 2);
-    SB_Push(sbuffer, 3, 6, A + 3);
-    SB_Push(sbuffer, 3, 7, A + 4);
-    SB_Push(sbuffer, 0, 7, A + 5);
-    SB_Push(sbuffer, 3, 4, A + 6);
-    SB_Push(sbuffer, 0, 3, A + 7);
-    SB_Push(sbuffer, 0, 5, A + 8);
+    SB_Push(sbuffer, 88.0f/15, 20.0f/3, 1.0f/15, 1.0f/6, A);
+    SB_Push(sbuffer, 28.0f/3, 152.0f/15, 1.0f/6, 1.0f/15, A + 1);
+    SB_Push(sbuffer, 20.0f/3, 28.0f/3, 1.0f/6, 1.0f/6, A + 2);
+    SB_Push(sbuffer, 17.0f/3, 8, 1.0f/12, 0.2, A + 3);
+    SB_Push(sbuffer, 8, 31.0f/3, 0.2, 1.0f/12, A + 4);
 
     SB_Dump(sbuffer);
     SB_Print(sbuffer);
