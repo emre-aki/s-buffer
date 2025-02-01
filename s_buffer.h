@@ -441,16 +441,15 @@ SB_Push
                     else
                     {
                         const float w_at_parent_x0 = SB_LERP(w0, w1,
-                                                            parent->x0 - x0,
-                                                            size);
-                        /* FIXME: 😬 */
-                        const int w_at_parent_x0_comp =
-                            (int) (w_at_parent_x0 * 1000000);
-                        const int parent_w0_comp = (int) (parent->w0 * 1000000);
+                                                             parent->x0 - x0,
+                                                             size);
 
-                        if (parent_w0_comp < w_at_parent_x0_comp ||
-                            parent_w0_comp == w_at_parent_x0_comp &&
-                                leftness > 0)
+                        // floating-point shenanigans
+                        const byte_t almost_equal =
+                            SB_Falmeq(w_at_parent_x0, parent->w0);
+
+                        if (parent->w0 < w_at_parent_x0 && !almost_equal ||
+                            almost_equal && leftness > 0)
                         {
                             /* ===== [CASE-L4]: obscures from the left ==== */
                             if (x1 < parent->x1)
@@ -538,13 +537,12 @@ SB_Push
                                                             parent->w1,
                                                             x - parent->x0,
                                                             parent_size);
-                        /* FIXME: 😬 */
-                        const int parent_w_at_x_comp =
-                            (int) (parent_w_at_x * 1000000);
-                        const int w_comp = (int) (w * 1000000);
 
-                        if (parent_w_at_x_comp < w_comp ||
-                            parent_w_at_x_comp == w_comp && leftness > 0)
+                        // ugh -- right in the precision! 😬
+                        const byte_t almost_equal = SB_Falmeq(parent_w_at_x, w);
+
+                        if (parent_w_at_x < w && !almost_equal ||
+                            almost_equal && leftness > 0)
                         {
                             if (x > parent->x0)
                             {
