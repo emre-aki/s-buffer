@@ -44,6 +44,8 @@
 #define SB_DEGENERATE 0x2
 #define SB_NOT_INTERSECTING 0x3
 
+#define SB_EPS 1e-5
+
 #define SB_MAX(a, b) ((((a) > (b)) * (a)) + (((b) >= (a)) * (b)))
 
 #define SB_LERP(a, b, p, t) (((b) - (a)) * (float) (p) / (t) + (a))
@@ -86,7 +88,7 @@ static byte_t SB_Falmeq (float x, float y)
     int i = *((int*) &res) & 0x7fffffff;
     res = *((float*) &i);
 
-    return res < 1e-6;
+    return res < SB_EPS;
 }
 
 static span_t* SB_Span (float x0, float x1, float w0, float w1, byte_t id)
@@ -151,7 +153,8 @@ SB_Intersect2D
 
     if (numer_t && !denom) return SB_PARALLEL;
     if (!(numer_t || denom)) return SB_DEGENERATE;
-    if (t <= 1e-6 || t >= 1 - 1e-6 || q <= 1e-6 || q >= 1 - 1e-6)
+    // TODO: maybe use `Falmeq` here as well?
+    if (t <= SB_EPS || t >= 1 - SB_EPS || q <= SB_EPS || q >= 1 - SB_EPS)
         return SB_NOT_INTERSECTING;
 
     out->x = t * u.x + a.x;
