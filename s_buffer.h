@@ -611,9 +611,12 @@ SB_Push
         const float clipright = SB_MAX(x + remaining - right, 0);
         const float clipped_size = remaining - clipleft - clipright;
 
-        /* only insert if there's something left to insert */
-        if (clipped_size > 0)
-        {
+        /* only insert if there's something left to insert -- this lower bound
+         * can be relaxed even further since the buffer has no sub-pixel
+         * precision
+         */
+        if (clipped_size > 1.0E-3) // to hell with the floating-point errors --
+        {                          // i'm this close to losing it 👌
             const float new_x0 = x + clipleft, new_x1 = new_x0 + clipped_size;
             const float new_w0 = SB_LERP(w0, w1, new_x0 - x0, size);
             const float new_w1 = SB_LERP(w0, w1, new_x1 - x0, size);
