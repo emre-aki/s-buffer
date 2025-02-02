@@ -46,6 +46,8 @@
 
 #define SB_EPS 1e-5
 
+#define SB_ASSERT(a, ...) if (!(a)) { fprintf(stderr, __VA_ARGS__); exit(1); }
+
 #define SB_MAX(a, b) ((((a) > (b)) * (a)) + (((b) >= (a)) * (b)))
 
 #define SB_LERP(a, b, p, t) (((b) - (a)) * (float) (p) / (t) + (a))
@@ -312,6 +314,31 @@ typedef struct {
     span_t* span;
     float   left, right;
 } pscope_t;
+
+#ifdef DEBUG
+static int _SB_Verify (span_t* span)
+{
+    const int balance_factor = SB_BF(span);
+    int left_res = 1, right_res = 1;
+
+    if (balance_factor < -1 || balance_factor > 1) return 0;
+    if (span->prev) left_res = _SB_Verify(span->prev);
+    if (span->next) right_res = _SB_Verify(span->next);
+
+    return left_res && right_res;
+}
+
+//
+// SB_Verify
+// Report whether or not an S-Buffer instance is properly balanced
+//
+static int SB_Verify (sbuffer_t* sbuffer)
+{
+    if (!sbuffer->root) return 1;
+
+    return _SB_Verify(sbuffer->root);
+}
+#endif
 
 //
 // SB_Push
@@ -667,14 +694,8 @@ SB_Push
                 if (balance_factor < -1 || balance_factor > 1)
                     imbalance_bookmark = stack_depth;
                 /* ...otherwise, update the height of this span */
-                else if (curr)
-                    /* FIXME: there might not be a need to use `MAX` here due to
-                     * the intrinsic nature of how AVL trees grow, i.e.,
-                     * `depth - stack_depth` should always be greater than or
-                     * equal to `span->height`
-                     */
-                    parent_span->height = SB_MAX(parent_span->height,
-                                                 depth - stack_depth);
+                else if (pushed)
+                    parent_span->height = SB_HEIGHT(parent_span);
             }
 
             --stack_depth;
@@ -823,6 +844,12 @@ SB_Push
                 depth = i; // adjust the stack pointer for the next iteration
             }
         }
+
+#ifdef DEBUG
+        const int verify = SB_Verify(sbuffer);
+        printf("[SB_Verify] %d\n", verify);
+        SB_ASSERT(verify, "[SB_Push] Buffer is not properly balanced!\n");
+#endif
     }
 
     if (!pushed)
