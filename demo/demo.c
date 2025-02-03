@@ -434,6 +434,12 @@ DrawSBufferDfs
             (stack + sp - 1)->prev_visited = 0xff;
             drawhook(buffer, parent);
             ++count;
+
+            if (curr)
+            {                                   // have to reset the "next"
+                (stack + sp)->prev_visited = 0; // position in the stack as the
+                (stack + sp)->next_visited = 0; // next iteration relies on its
+            }                                   // up-to-date value
         }
 
         if (!curr && --sp > 0) // reached a leaf node, need to backtrack
@@ -616,21 +622,36 @@ void Prepopulate (sbuffer_t* sbuffer, seg2_t* segs, size_t* seg_head)
     // };
 
     /* [✅] FP precision causing DFS infinite loop issue */
-    const size_t prepop_segs_count = 11;
+    // const size_t prepop_segs_count = 11;
+    // seg2_t prepop_segs[] = {
+    //     { { 0, 624 }, { 800, 624 }, 0x00ff00ff },   // A
+    //     { { 16, 640 }, { 80, 624 }, 0x00ff00ff },   // B
+    //     { { 112, 640 }, { 192, 640 }, 0x00ff00ff }, // C
+    //     { { 272, 640 }, { 336, 640 }, 0x00ff00ff }, // D
+    //     { { 400, 640 }, { 496, 640 }, 0x00ff00ff }, // E
+    //     ////////////////////////////////////////////////
+    //     { { 528, 624 }, { 576, 608 }, 0x00ff00ff }, // F
+    //     { { 576, 608 }, { 592, 624 }, 0x00ff00ff }, // G
+    //     { { 560, 608 }, { 592, 608 }, 0x00ff00ff }, // H
+    //     ////////////////////////////////////////////////
+    //     { { 624, 640 }, { 688, 640 }, 0x00ff00ff }, // I
+    //     { { 736, 640 }, { 784, 640 }, 0x00ff00ff }, // J
+    //     { { 0, 640 }, { 800, 640 }, 0x00ff00ff }    // K
+    // };
+
+    /* [✅] DFS span skipping issue */
+    const size_t prepop_segs_count = 10;
     seg2_t prepop_segs[] = {
-        { { 0, 624 }, { 800, 624 }, 0x00ff00ff },   // A
-        { { 16, 640 }, { 80, 624 }, 0x00ff00ff },   // B
-        { { 112, 640 }, { 192, 640 }, 0x00ff00ff }, // C
-        { { 272, 640 }, { 336, 640 }, 0x00ff00ff }, // D
-        { { 400, 640 }, { 496, 640 }, 0x00ff00ff }, // E
-        ////////////////////////////////////////////////
-        { { 528, 624 }, { 576, 608 }, 0x00ff00ff }, // F
-        { { 576, 608 }, { 592, 624 }, 0x00ff00ff }, // G
-        { { 560, 608 }, { 592, 608 }, 0x00ff00ff }, // H
-        ////////////////////////////////////////////////
-        { { 624, 640 }, { 688, 640 }, 0x00ff00ff }, // I
-        { { 736, 640 }, { 784, 640 }, 0x00ff00ff }, // J
-        { { 0, 640 }, { 800, 640 }, 0x00ff00ff }    // K
+        { { 80, 128 }, { 80, 608 }, 0x00ff00ff },   // A
+        { { 32, 384 }, { 128, 448 }, 0x00ff00ff },  // B
+        { { 32, 224 }, { 128, 288 }, 0x00ff00ff },  // C
+        { { 32, 128 }, { 128, 192 }, 0x00ff00ff },  // D
+        { { 64, 64 }, { 128, 192 }, 0x00ff00ff },   // E
+        { { 128, 192 }, { 128, 288 }, 0xff0000ff }, // F
+        { { 128, 288 }, { 128, 448 }, 0x00ff00ff }, // G
+        { { 32, 592 }, { 128, 656 }, 0x00ff00ff },  // H
+        { { 80, 608 }, { 80, 688 }, 0x00ff00ff },   // I
+        { { 128, 448 }, { 128, 656 }, 0x00ff00ff }  // J
     };
 
     for (int i = 0; i < prepop_segs_count; ++i)
