@@ -640,18 +640,27 @@ void Prepopulate (sbuffer_t* sbuffer, seg2_t* segs, size_t* seg_head)
     // };
 
     /* [✅] DFS span skipping issue */
-    const size_t prepop_segs_count = 10;
+    // const size_t prepop_segs_count = 10;
+    // seg2_t prepop_segs[] = {
+    //     { { 80, 128 }, { 80, 608 }, 0x00ff00ff },   // A
+    //     { { 32, 384 }, { 128, 448 }, 0x00ff00ff },  // B
+    //     { { 32, 224 }, { 128, 288 }, 0x00ff00ff },  // C
+    //     { { 32, 128 }, { 128, 192 }, 0x00ff00ff },  // D
+    //     { { 64, 64 }, { 128, 192 }, 0x00ff00ff },   // E
+    //     { { 128, 192 }, { 128, 288 }, 0xff0000ff }, // F
+    //     { { 128, 288 }, { 128, 448 }, 0x00ff00ff }, // G
+    //     { { 32, 592 }, { 128, 656 }, 0x00ff00ff },  // H
+    //     { { 80, 608 }, { 80, 688 }, 0x00ff00ff },   // I
+    //     { { 128, 448 }, { 128, 656 }, 0x00ff00ff }  // J
+    // };
+
+    /* [✅] FP precision causing z-fighting issue */
+    const size_t prepop_segs_count = 4;
     seg2_t prepop_segs[] = {
-        { { 80, 128 }, { 80, 608 }, 0x00ff00ff },   // A
-        { { 32, 384 }, { 128, 448 }, 0x00ff00ff },  // B
-        { { 32, 224 }, { 128, 288 }, 0x00ff00ff },  // C
-        { { 32, 128 }, { 128, 192 }, 0x00ff00ff },  // D
-        { { 64, 64 }, { 128, 192 }, 0x00ff00ff },   // E
-        { { 128, 192 }, { 128, 288 }, 0xff0000ff }, // F
-        { { 128, 288 }, { 128, 448 }, 0x00ff00ff }, // G
-        { { 32, 592 }, { 128, 656 }, 0x00ff00ff },  // H
-        { { 80, 608 }, { 80, 688 }, 0x00ff00ff },   // I
-        { { 128, 448 }, { 128, 656 }, 0x00ff00ff }  // J
+        { { 272, 208 }, { 592, 208 }, 0xff0000ff }, // A
+        { { 416, 176 }, { 464, 240 }, 0x00ff00ff }, // B
+        { { 336, 176 }, { 464, 240 }, 0x0000ffff }, // C
+        { { 320, 176 }, { 464, 240 }, 0xffff00ff }  // D
     };
 
     for (int i = 0; i < prepop_segs_count; ++i)

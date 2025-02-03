@@ -489,6 +489,10 @@ SB_Push
                                                              parent->x0 - x0,
                                                              size);
 
+                        // TODO: it might be better to compare `w_clip` (1/w)
+                        // here instead of `z_ndc` (w) to mitigate some of the
+                        // z-fighting issues at the cost of a float division
+
                         // floating-point shenanigans
                         const byte_t almost_equal =
                             SB_Falmeq(w_at_parent_x0, parent->w0);
@@ -585,6 +589,10 @@ SB_Push
                                                             parent->w1,
                                                             x - parent->x0,
                                                             parent_size);
+
+                        // TODO: it might be better to compare `w_clip` (1/w)
+                        // here instead of `z_ndc` (w) to mitigate some of the
+                        // z-fighting issues at the cost of a float division
 
                         // ugh -- right in the precision! 😬
                         const byte_t almost_equal = SB_Falmeq(parent_w_at_x, w);
