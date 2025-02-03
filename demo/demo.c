@@ -380,7 +380,7 @@ DrawSBufferDfs
     SDL_RenderFillRect(buffer, &sbuffer_rect);
 
     span_t* curr = sbuffer->root;
-    dfs_t stack[sbuffer->max_depth];
+    dfs_t stack[sbuffer->max_depth + 1];
     int sp = 0;
     size_t count = 0;
     memset(stack, 0, sizeof(stack));
