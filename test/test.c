@@ -13,13 +13,14 @@
 int main ()
 {
     const byte_t A = 65;
-    sbuffer_t* sbuffer = SB_Init(16, 4, 1024);
+    const int COLOR = 0xffffffff;
 
-    SB_Push(sbuffer, 88.0f/15, 20.0f/3, 1.0f/15, 1.0f/6, A);
-    SB_Push(sbuffer, 28.0f/3, 152.0f/15, 1.0f/6, 1.0f/15, A + 1);
-    SB_Push(sbuffer, 20.0f/3, 28.0f/3, 1.0f/6, 1.0f/6, A + 2);
-    SB_Push(sbuffer, 17.0f/3, 8, 1.0f/12, 0.2, A + 3);
-    SB_Push(sbuffer, 8, 31.0f/3, 0.2, 1.0f/12, A + 4);
+    sbuffer_t* sbuffer = SB_Init(16, 4, 1024);
+    SB_Push(sbuffer, 88.0f/15, 20.0f/3, 1.0f/15, 1.0f/6, A, COLOR);
+    SB_Push(sbuffer, 28.0f/3, 152.0f/15, 1.0f/6, 1.0f/15, A + 1, COLOR);
+    SB_Push(sbuffer, 20.0f/3, 28.0f/3, 1.0f/6, 1.0f/6, A + 2, COLOR);
+    SB_Push(sbuffer, 17.0f/3, 8, 1.0f/12, 0.2, A + 3, COLOR);
+    SB_Push(sbuffer, 8, 31.0f/3, 0.2, 1.0f/12, A + 4, COLOR);
 
     SB_Dump(sbuffer);
     SB_Print(sbuffer);

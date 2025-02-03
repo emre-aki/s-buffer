@@ -71,6 +71,7 @@ typedef struct span {
     float        w0,    w1;   // reciprocal depths associated with each endpoint
     int          height;      // how tall is this span?
     byte_t       id;
+    int          color;
 } span_t;
 
 typedef struct {
@@ -93,7 +94,13 @@ static byte_t SB_Falmeq (float x, float y)
     return res < SB_EPS;
 }
 
-static span_t* SB_Span (float x0, float x1, float w0, float w1, byte_t id)
+static
+span_t*
+SB_Span
+( float x0, float x1,
+  float w0, float w1,
+  byte_t id,
+  int color )
 {
     span_t* span = (span_t*) malloc(sizeof(span_t));
 
@@ -105,6 +112,7 @@ static span_t* SB_Span (float x0, float x1, float w0, float w1, byte_t id)
     span->w1 = w1;
     span->height = 0;
     span->id = id;
+    span->color = color;
 
     return span;
 }
@@ -246,13 +254,15 @@ SB_BisectParent
   float   x0,    float x1,
   float   w0,    float w1,
   float   visx0, float visx1,
-  byte_t  id )
+  byte_t  id,
+  int     color )
 {
     const float size = x1 - x0;
     const float old_parent_size = parent->x1 - parent->x0;
     const float old_parent_x0 = parent->x0, old_parent_x1 = parent->x1;
     const float old_parent_w0 = parent->w0, old_parent_w1 = parent->w1;
     const byte_t old_parent_id = parent->id;
+    const int old_parent_color = parent->color;
     span_t* parent_split;
 
     /* override the `parent` with the visible portion of the `span` */
@@ -260,13 +270,15 @@ SB_BisectParent
     parent->w0 = SB_LERP(w0, w1, visx0 - x0, size);
     parent->w1 = SB_LERP(w0, w1, visx1 - x0, size);
     parent->id = id;
+    parent->color = color;
 
     /* insert the left bisection of the parent immediately to the left */
     parent_split = SB_Span(old_parent_x0, visx0,
                            old_parent_w0, SB_LERP(old_parent_w0, old_parent_w1,
                                                   visx0 - old_parent_x0,
                                                   old_parent_size),
-                           old_parent_id);
+                           old_parent_id,
+                           old_parent_color);
     parent_split->prev = parent->prev;
     parent->prev = parent_split;
     if (SB_BF(parent_split) < -1)  // balance if necessary
@@ -302,7 +314,8 @@ SB_BisectParent
                                    visx1 - old_parent_x0,
                                    old_parent_size),
                            old_parent_w1,
-                           old_parent_id);
+                           old_parent_id,
+                           old_parent_color);
     parent_split->next = parent->next;
     parent->next = parent_split;
     parent_split->height = SB_HEIGHT(parent_split);
@@ -358,7 +371,8 @@ SB_Push
 ( sbuffer_t* sbuffer,
   float  x0, float x1,
   float  w0, float w1,
-  byte_t id )
+  byte_t id,
+  int color )
 {
     const float size = x1 - x0;
     span_t* curr = sbuffer->root;
@@ -378,7 +392,7 @@ SB_Push
             const float new_x0 = x0 + clipleft, new_x1 = new_x0 + clipped_size;
             const float new_w0 = SB_LERP(w0, w1, new_x0 - x0, size);
             const float new_w1 = SB_LERP(w0, w1, new_x1 - x0, size);
-            sbuffer->root = SB_Span(new_x0, new_x1, new_w0, new_w1, id);
+            sbuffer->root = SB_Span(new_x0, new_x1, new_w0, new_w1, id, color);
 
             return 0;
         }
@@ -445,9 +459,10 @@ SB_Push
                             /* ------------[ CASE-L1: bisecting ]------------ */
                             if (x1 < parent->x1)
                             {
-                                SB_BisectParent(parent, x0, x1, w0, w1,
+                                SB_BisectParent(parent,
+                                                x0, x1, w0, w1,
                                                 intersection, x1,
-                                                id);
+                                                id, color);
                                 pushed = 0xff;
                             }
                             /* -----[ CASE-L2: obscures from the right ]----- */
@@ -497,6 +512,7 @@ SB_Push
                                                      parent->x1 - x0,
                                                      size);
                                 parent->id = id;
+                                parent->color = color;
                                 pushed = 0xff;
                             }
                         }
@@ -520,9 +536,10 @@ SB_Push
                             /* ------------[ CASE-R1: bisecting ]------------ */
                             if (x1 < parent->x1)
                             {
-                                SB_BisectParent(parent, x0, x1, w0, w1,
+                                SB_BisectParent(parent,
+                                                x0, x1, w0, w1,
                                                 intersection, x1,
-                                                id);
+                                                id, color);
                                 pushed = 0xff;
                             }
                             /* -----[ CASE-R2: obscures from the right ]----- */
@@ -539,9 +556,10 @@ SB_Push
                             /* ------------[ CASE-R3: bisecting ]------------ */
                             if (x > parent->x0)
                             {
-                                SB_BisectParent(parent, x0, x1, w0, w1,
+                                SB_BisectParent(parent,
+                                                x0, x1, w0, w1,
                                                 x, intersection,
-                                                id);
+                                                id, color);
                                 pushed = 0xff;
                             }
                             /* ------[ CASE-R4: obscures from the left ]----- */
@@ -579,9 +597,10 @@ SB_Push
                                 /* ----------[ CASE-R5: bisecting ]---------- */
                                 if (x1 < parent->x1)
                                 {
-                                    SB_BisectParent(parent, x0, x1, w0, w1,
+                                    SB_BisectParent(parent,
+                                                    x0, x1, w0, w1,
                                                     x, x1,
-                                                    id);
+                                                    id, color);
                                     pushed = 0xff;
                                 }
                                 /* ---[ CASE-R6: obscures from the right ]--- */
@@ -619,6 +638,7 @@ SB_Push
                                                          parent->x1 - x0,
                                                          size);
                                     parent->id = id;
+                                    parent->color = color;
                                     pushed = 0xff;
                                 }
                             }
@@ -647,7 +667,7 @@ SB_Push
             const float new_x0 = x + clipleft, new_x1 = new_x0 + clipped_size;
             const float new_w0 = SB_LERP(w0, w1, new_x0 - x0, size);
             const float new_w1 = SB_LERP(w0, w1, new_x1 - x0, size);
-            curr = SB_Span(new_x0, new_x1, new_w0, new_w1, id);
+            curr = SB_Span(new_x0, new_x1, new_w0, new_w1, id, color);
             if (x < parent->x0) parent->prev = curr;
             else parent->next = curr;
             pushed = 0xff;
