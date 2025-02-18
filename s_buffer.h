@@ -44,7 +44,7 @@
 #define SB_DEGENERATE 0x2
 #define SB_NOT_INTERSECTING 0x3
 
-#define SB_EPS 1e-5
+#define SB_EPS 1e-4
 
 #define SB_ASSERT(a, ...) if (!(a)) { fprintf(stderr, __VA_ARGS__); exit(1); }
 
@@ -202,7 +202,7 @@ SB_SpanIntersect
   float* out,
   float* leftness )
 {
-    const float buffer_width_half = buffer_width * 0.5;
+    const float buffer_width_half = buffer_width * 0.5f;
     const float _z_near = 1.0f / z_near;
     const float u_z0 = 1.0f / u_w0, u_z1 = 1.0f / u_w1;
     const float v_z0 = 1.0f / v_w0, v_z1 = 1.0f / v_w1;
@@ -729,8 +729,8 @@ SB_Push
          * can be relaxed even further since the buffer has no sub-pixel
          * precision
          */
-        if (clipped_size > 1.0E-3) // to hell with the floating-point errors --
-        {                          // i'm this close to losing it 👌
+        if (clipped_size > 1e-3) // to hell with the floating-point errors --
+        {                        // i'm this close to losing it 👌
             const float new_x0 = x + clipleft, new_x1 = new_x0 + clipped_size;
             const float new_w0 = SB_LERP(w0, w1, new_x0 - x0, size);
             const float new_w1 = SB_LERP(w0, w1, new_x1 - x0, size);
