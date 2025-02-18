@@ -281,7 +281,7 @@ SB_BisectParent
                            old_parent_color);
     parent_split->prev = parent->prev;
     parent->prev = parent_split;
-    if (SB_BF(parent_split) < -1)  // balance if necessary
+    if (SB_BF(parent_split) < -1)  // balance the left bisection if necessary
     {
         span_t* old_parent = parent_split;
         span_t* new_parent = parent_split->prev;
@@ -318,8 +318,32 @@ SB_BisectParent
                            old_parent_color);
     parent_split->next = parent->next;
     parent->next = parent_split;
-    parent_split->height = SB_HEIGHT(parent_split);
+    if (SB_BF(parent_split) > 1)  // balance the right bisection if necessary
+    {
+        span_t* old_parent = parent_split;
+        span_t* new_parent = parent_split->next;
+        span_t* child = new_parent->next;
 
+        if (SB_BF(new_parent) < 0) // need to do a double-rotation
+        {
+            child = new_parent;
+            new_parent = child->prev;
+            child->prev = new_parent->next;
+            new_parent->next = child;
+        }
+
+        old_parent->next = new_parent->prev;
+        new_parent->prev = old_parent;
+        parent->next = new_parent;
+        /* update the heights of the spans affected by the balancing */
+        old_parent->height = SB_HEIGHT(old_parent);
+        child->height = SB_HEIGHT(child);
+        new_parent->height = SB_HEIGHT(new_parent);
+    }
+    else
+    {
+        parent_split->height = SB_HEIGHT(parent_split);
+    }
     parent->height = SB_HEIGHT(parent);
 }
 
@@ -329,27 +353,62 @@ typedef struct {
 } pscope_t;
 
 #ifdef DEBUG
-static int _SB_Verify (span_t* span)
+static int _SB_VerifyBalance (span_t* span)
 {
     const int balance_factor = SB_BF(span);
     int left_res = 1, right_res = 1;
 
     if (balance_factor < -1 || balance_factor > 1) return 0;
-    if (span->prev) left_res = _SB_Verify(span->prev);
-    if (span->next) right_res = _SB_Verify(span->next);
+    if (span->prev) left_res = _SB_VerifyBalance(span->prev);
+    if (span->next) right_res = _SB_VerifyBalance(span->next);
 
     return left_res && right_res;
 }
 
 //
-// SB_Verify
+// SB_VerifyBalance
 // Report whether or not an S-Buffer instance is properly balanced
 //
-static int SB_Verify (sbuffer_t* sbuffer)
+static int SB_VerifyBalance (sbuffer_t* sbuffer)
 {
     if (!sbuffer->root) return 1;
 
-    return _SB_Verify(sbuffer->root);
+    return _SB_VerifyBalance(sbuffer->root);
+}
+
+static int _SB_VerifyHeights (span_t* span, byte_t* res)
+{
+    if (!(span->prev || span->next))
+    {
+        if (span->height != 0) *res &= 0;
+
+        return 0;
+    }
+
+    int left_height = 0, right_height = 0;
+    if (span->prev) left_height = _SB_VerifyHeights(span->prev, res);
+    if (span->next) right_height = _SB_VerifyHeights(span->next, res);
+    const int self_height = SB_MAX(left_height, right_height) + 1;
+
+    if (self_height != span->height) *res &= 0;
+
+    return self_height;
+}
+
+//
+// SB_VerifyHeights
+// Report whether or not each span node in an S-Buffer instance has its height
+// assigned correctly
+//
+static int SB_VerifyHeights (sbuffer_t* sbuffer)
+{
+    if (!sbuffer->root) return 1;
+
+    byte_t res = 0xff;
+
+    _SB_VerifyHeights(sbuffer->root, &res);
+
+    return res;
 }
 #endif
 
@@ -874,9 +933,15 @@ SB_Push
         }
 
 #ifdef DEBUG
-        const int verify = SB_Verify(sbuffer);
-        printf("[SB_Verify] %d\n", verify);
-        SB_ASSERT(verify, "[SB_Push] Buffer is not properly balanced!\n");
+        const int verify_balance = SB_VerifyBalance(sbuffer);
+        const int verify_heights = SB_VerifyHeights(sbuffer);
+        if (!(verify_balance && verify_heights))
+        {
+            printf("[SB_VerifyBalance] %d\n", verify_balance);
+            printf("[SB_VerifyHeights] %d\n", verify_heights);
+        }
+        SB_ASSERT(verify_heights, "[SB_Push] Improper buffer height!\n");
+        SB_ASSERT(verify_balance, "[SB_Push] Buffer is improperly balanced!\n");
 #endif
     }
 
