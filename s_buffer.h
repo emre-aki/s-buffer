@@ -442,7 +442,7 @@ SB_Push
                     {
                         if (leftness > 0)
                         {
-                            /* =========== [CASE-L1]: bisecting =========== */
+                            /* ------------[ CASE-L1: bisecting ]------------ */
                             if (x1 < parent->x1)
                             {
                                 SB_BisectParent(parent, x0, x1, w0, w1,
@@ -450,7 +450,7 @@ SB_Push
                                                 id);
                                 pushed = 0xff;
                             }
-                            /* ==== [CASE-L2]: obscures from the right ==== */
+                            /* -----[ CASE-L2: obscures from the right ]----- */
                             else
                             {
                                 parent->w1 = SB_LERP(parent->w0, parent->w1,
@@ -459,7 +459,7 @@ SB_Push
                                 parent->x1 = intersection;
                             }
                         }
-                        /* ======= [CASE-L3]: obscures from the left ====== */
+                        /* --------[ CASE-L3: obscures from the left ]------- */
                         else
                         {
                             parent->w0 = SB_LERP(parent->w0, parent->w1,
@@ -481,7 +481,7 @@ SB_Push
                         if (parent->w0 < w_at_parent_x0 && !almost_equal ||
                             almost_equal && leftness > 0)
                         {
-                            /* ===== [CASE-L4]: obscures from the left ==== */
+                            /* ------[ CASE-L4: obscures from the left ]----- */
                             if (x1 < parent->x1)
                             {
                                 parent->w0 = SB_LERP(parent->w0, parent->w1,
@@ -489,7 +489,7 @@ SB_Push
                                                      parent_size);
                                 parent->x0 = x1;
                             }
-                            /* ====== [CASE-L5]: completely obscures ====== */
+                            /* -------[ CASE-L5: completely obscures ]------- */
                             else
                             {
                                 parent->w0 = w_at_parent_x0;
@@ -517,7 +517,7 @@ SB_Push
                     {
                         if (leftness > 0)
                         {
-                            /* =========== [CASE-R1]: bisecting =========== */
+                            /* ------------[ CASE-R1: bisecting ]------------ */
                             if (x1 < parent->x1)
                             {
                                 SB_BisectParent(parent, x0, x1, w0, w1,
@@ -525,7 +525,7 @@ SB_Push
                                                 id);
                                 pushed = 0xff;
                             }
-                            /* ==== [CASE-R2]: obscures from the right ==== */
+                            /* -----[ CASE-R2: obscures from the right ]----- */
                             else
                             {
                                 parent->w1 = SB_LERP(parent->w0, parent->w1,
@@ -536,7 +536,7 @@ SB_Push
                         }
                         else
                         {
-                            /* =========== [CASE-R3]: bisecting =========== */
+                            /* ------------[ CASE-R3: bisecting ]------------ */
                             if (x > parent->x0)
                             {
                                 SB_BisectParent(parent, x0, x1, w0, w1,
@@ -544,7 +544,7 @@ SB_Push
                                                 id);
                                 pushed = 0xff;
                             }
-                            /* ===== [CASE-R4]: obscures from the left ==== */
+                            /* ------[ CASE-R4: obscures from the left ]----- */
                             else
                             {
                                 parent->w0 = SB_LERP(parent->w0, parent->w1,
@@ -576,7 +576,7 @@ SB_Push
                         {
                             if (x > parent->x0)
                             {
-                                /*========== [CASE-R5]: bisecting ========= */
+                                /* ----------[ CASE-R5: bisecting ]---------- */
                                 if (x1 < parent->x1)
                                 {
                                     SB_BisectParent(parent, x0, x1, w0, w1,
@@ -584,7 +584,7 @@ SB_Push
                                                     id);
                                     pushed = 0xff;
                                 }
-                                /* == [CASE-R6]: obscures from the right == */
+                                /* ---[ CASE-R6: obscures from the right ]--- */
                                 else
                                 {
                                     parent->w1 = SB_LERP(parent->w0, parent->w1,
@@ -595,7 +595,7 @@ SB_Push
                             }
                             else
                             {
-                                /* === [CASE-R7]: obscures from the left == */
+                                /* ----[ CASE-R7: obscures from the left ]--- */
                                 if (x1 < parent->x1)
                                 {
                                     parent->w0 = SB_LERP(parent->w0, parent->w1,
@@ -611,7 +611,7 @@ SB_Push
                                      continue;
 
                                 }
-                                /* ==== [CASE-R8]: completely obscures ==== */
+                                /* -----[ CASE-R8: completely obscures ]----- */
                                 else
                                 {
                                     parent->w0 = w;
