@@ -548,15 +548,14 @@ SB_Push
                                                              parent->x0 - x0,
                                                              size);
 
-                        // TODO: it might be better to compare `w_clip` (1/w)
-                        // here instead of `z_ndc` (w) to mitigate some of the
-                        // z-fighting issues at the cost of a float division
+                        const float z_at_parent_x0 = 1 / w_at_parent_x0;
+                        const float parent_z0 = 1 / parent->w0;
 
                         // floating-point shenanigans
                         const byte_t almost_equal =
-                            SB_Falmeq(w_at_parent_x0, parent->w0);
+                            SB_Falmeq(z_at_parent_x0, parent_z0);
 
-                        if (parent->w0 < w_at_parent_x0 && !almost_equal ||
+                        if (z_at_parent_x0 < parent_z0 && !almost_equal ||
                             almost_equal && leftness > 0)
                         {
                             /* ------[ CASE-L4: obscures from the left ]----- */
@@ -644,19 +643,16 @@ SB_Push
                     }
                     else
                     {
-                        const float parent_w_at_x = SB_LERP(parent->w0,
-                                                            parent->w1,
-                                                            x - parent->x0,
-                                                            parent_size);
-
-                        // TODO: it might be better to compare `w_clip` (1/w)
-                        // here instead of `z_ndc` (w) to mitigate some of the
-                        // z-fighting issues at the cost of a float division
+                        const float parent_z_at_x = 1 / SB_LERP(parent->w0,
+                                                                parent->w1,
+                                                                x - parent->x0,
+                                                                parent_size);
+                        const float z = 1 / w;
 
                         // ugh -- right in the precision! 😬
-                        const byte_t almost_equal = SB_Falmeq(parent_w_at_x, w);
+                        const byte_t almost_equal = SB_Falmeq(parent_z_at_x, z);
 
-                        if (parent_w_at_x < w && !almost_equal ||
+                        if (z < parent_z_at_x && !almost_equal ||
                             almost_equal && leftness > 0)
                         {
                             if (x > parent->x0)
