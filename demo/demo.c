@@ -16,6 +16,7 @@
 
 #include <SDL2/SDL.h>
 
+#define S_BUFFER_DEFS_ONLY
 #include "s_buffer.h"
 
 #define SIGN(x) (((x) >> 31 << 1) + 1)
@@ -1040,10 +1041,10 @@ Update
         screen_w1 = src_min * ZToScreenSpace(seg.dst.y) +
                     !src_min * ZToScreenSpace(seg.src.y);
 
-        //
+#ifdef DEBUG
         printf("{ { %d, %d }, { %d, %d }, %d }\n",
                 seg.src.x, seg.src.y, seg.dst.x, seg.dst.y, seg.color);
-        //
+#endif // DEBUG
 
         struct timespec start, end;
 

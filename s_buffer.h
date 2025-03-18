@@ -26,9 +26,7 @@
 
 #ifndef s_buffer_h
 
-#include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 
 #define s_buffer_h
 #define s_buffer_h_span_t span_t
@@ -80,6 +78,25 @@ typedef struct {
     float   z_near;    // distance from the eye to the near-clipping plane
     size_t  max_depth; // the maximum depth the root span is allowed to grow to
 } sbuffer_t;
+
+sbuffer_t* SB_Init (int size, float z_near, size_t max_depth);
+
+int
+SB_Push
+( sbuffer_t* sbuffer,
+  float  x0, float x1,
+  float  w0, float w1,
+  byte_t id,
+  int color );
+
+void SB_Dump (sbuffer_t* sbuffer);
+void SB_Print (sbuffer_t* sbuffer);
+void SB_Destroy (sbuffer_t* sbuffer);
+
+#ifndef S_BUFFER_DEFS_ONLY
+
+#include <stdio.h>
+#include <math.h>
 
 typedef struct {
     float x, z;
@@ -497,12 +514,10 @@ SB_BisectParent
 }
 
 #ifdef DEBUG
-static void SB_Dump(sbuffer_t* sbuffer);
-
-static int _SB_VerifyBalance (span_t* span)
+static byte_t _SB_VerifyBalance (span_t* span)
 {
     const int balance_factor = SB_BF(span);
-    int left_res = 1, right_res = 1;
+    byte_t left_res = 1, right_res = 1;
 
     if (balance_factor < -1 || balance_factor > 1) return 0;
     if (span->prev) left_res = _SB_VerifyBalance(span->prev);
@@ -515,7 +530,7 @@ static int _SB_VerifyBalance (span_t* span)
 // SB_VerifyBalance
 // Report whether or not an S-Buffer instance is properly balanced
 //
-static int SB_VerifyBalance (sbuffer_t* sbuffer)
+static byte_t SB_VerifyBalance (sbuffer_t* sbuffer)
 {
     if (!sbuffer->root) return 1;
 
@@ -550,13 +565,13 @@ static int SB_VerifyHeights (sbuffer_t* sbuffer)
 {
     if (!sbuffer->root) return 1;
 
-    byte_t res = 0xff;
+    byte_t res = 1;
 
     _SB_VerifyHeights(sbuffer->root, &res);
 
     return res;
 }
-#endif
+#endif // DEBUG
 
 //
 // SB_Push
@@ -1121,7 +1136,7 @@ SB_Push
         }
         SB_ASSERT(verify_heights, "[SB_Push] Improper buffer height!\n");
         SB_ASSERT(verify_balance, "[SB_Push] Buffer is improperly balanced!\n");
-#endif
+#endif // DEBUG
     }
 
     if (!pushed)
@@ -1238,4 +1253,5 @@ void SB_Destroy (sbuffer_t* sbuffer)
     free(sbuffer);
 }
 
-#endif
+#endif // S_BUFFER_DEFS_ONLY
+#endif // s_buffer_h

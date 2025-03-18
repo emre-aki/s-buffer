@@ -49,6 +49,15 @@ $ gcc ./your_program.c -o ./your-executable \
 $ LD_LIBRARY_PATH=/path/to/the/directory/containing/libsbuffer.so ./your-executable
 ```
 
+With this option, you'd also want to enable the `S_BUFFER_DEFS_ONLY` macro when
+including `s_buffer.h` in your source to refrain from having the actual
+implementation link against your program a second time.
+
+```c
+#define S_BUFFER_DEFS_ONLY
+#include "/path/to/s_buffer.h"
+```
+
 ### Option 2: Including in your source (Recommended)
 
 Since it has originally been designed to be used as a header-only library, the
