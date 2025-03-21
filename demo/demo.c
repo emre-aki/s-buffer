@@ -441,6 +441,9 @@ static const byte_t GLYPH_TABLE[128][FONT_WIDTH * FONT_HEIGHT] = {
     },
 };
 
+const size_t SBUFFER_SIZE = sizeof(sbuffer_t);
+const size_t SPAN_SIZE = sizeof(span_t);
+
 int FastAbs (int x)
 {
     const int sign_mask = x >> 31;
@@ -975,18 +978,22 @@ Update
   mouse_state_t* ms,
   byte_t*        ks,
   seg2_t*        segs,
-  size_t*        seg_head )
+  size_t*        seg_head,
+  double*        push_time_millis,
+  int*           disappear_ticks )
 {
+    size_t span_count;
     size_t head = *seg_head;
     vec2_t dst;
     byte_t prev_holding_mouse_button = ms->pressed == SDL_BUTTON_LEFT;
     byte_t holding_esc;
+    byte_t did_push = 0;
     HandleEventSync(do_run, ms, ks);
     DrawGrid(buffer);
     DrawFrustum(buffer);
     DrawAxes(buffer);
     DrawSegments(buffer, ks, segs, *seg_head);
-    DrawSBufferDfs(buffer, sbuffer, DrawSpan);
+    span_count = DrawSBufferDfs(buffer, sbuffer, DrawSpan);
     holding_esc = *(ks + KEY_ESC);
 
     /* left mouse button is being held down */
@@ -1004,6 +1011,7 @@ Update
     /* left mouse button is released */
     else if (!holding_esc && prev_holding_mouse_button && !ms->pressed)
     {
+        did_push = 0xff;
         vec2_t src = { ms->x, ms->y };
         seg2_t seg = { src, dst, RandomColor() };
 
@@ -1031,11 +1039,52 @@ Update
         screen_x1 = src_min * screen_dst + !src_min * screen_src;
         screen_w1 = src_min * ZToScreenSpace(seg.dst.y) +
                     !src_min * ZToScreenSpace(seg.src.y);
+
+        //
+        printf("{ { %d, %d }, { %d, %d }, %d }\n",
+                seg.src.x, seg.src.y, seg.dst.x, seg.dst.y, seg.color);
+        //
+
+        struct timespec start, end;
+
+        timespec_get(&start, TIME_UTC);
+
         SB_Push(sbuffer,
                 screen_x0, screen_x1,
                 screen_w0, screen_w1,
                 ID++,
                 seg.color);
+
+        timespec_get(&end, TIME_UTC);
+
+        *push_time_millis = (end.tv_sec - start.tv_sec +
+                             (end.tv_nsec - start.tv_nsec) / 1e9f) * 1e3f;
+    }
+
+    /* print debug statistics */
+    const size_t memused = span_count * SPAN_SIZE + SBUFFER_SIZE;
+    byte_t strbuf[100];
+    sprintf(strbuf, "s-buffer memory: %lu bytes used (%.0f%%)",
+            memused, round((float) memused / 32.0f));
+    Text(buffer, strbuf, 16, 16, 2, 0xff0000ff);
+    sprintf(strbuf, "span count     : %lu", span_count);
+    Text(buffer, strbuf, 16, 32, 2, 0xff0000ff);
+    sprintf(strbuf,
+            "buffer depth   : %d",
+            sbuffer->root ? sbuffer->root->height : 0);
+    Text(buffer, strbuf, 16, 48, 2, 0xff0000ff);
+
+    if (did_push) *disappear_ticks = 250;
+
+    if (*disappear_ticks > 0)
+    {
+        sprintf(strbuf, "push took      : %.3f ms", *push_time_millis);
+        Text(buffer, strbuf, 16, 64, 2, 0xff0000ff);
+        *disappear_ticks = *disappear_ticks - 1;
+    }
+    else
+    {
+        *push_time_millis = 0;
     }
 
     *seg_head = head;
@@ -1309,6 +1358,9 @@ int main (int argc, char** argv)
             Prepopulate(sbuffer, segs, &seg_head);
     }
 
+    int disappear_ticks = 0; // timeout before we remove the 'push took' message
+    double push_time_millis = 0; // how long the latest push took
+
     /* main loop */
     while (do_run)
         Update(sbuffer,
@@ -1318,7 +1370,9 @@ int main (int argc, char** argv)
                &ms,
                ks,
                segs,
-               &seg_head);
+               &seg_head,
+               &push_time_millis,
+               &disappear_ticks);
 
     printf("--------------------------[ SB_Dump ]--------------------------\n");
     SB_Dump(sbuffer);
