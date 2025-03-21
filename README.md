@@ -1,6 +1,15 @@
 # S-Buffer
 
-A rather unique implementation of the ubiquitous S-Buffer[^1], once a popular
+<br>
+<p align="center">
+    <img width="684" src="./images/sb00.png"></img>
+    <p align="center">
+        <em style="font-size: 14px;">S-Buffer in action</em>
+    </p>
+</p>
+<br>
+
+A rather unique implementation of the S-Buffer[^1] algorithm, once a popular
 alternative to Z-Buffering for solving the hidden surface removal problem in
 software rendering.
 
@@ -73,7 +82,7 @@ int main ()
 }
 ```
 
-## Usage
+## Basic usage
 
 ### Initialization
 
@@ -155,6 +164,14 @@ SB_Dump(sbuffer);
 // Free up all memory allocated by the buffer.
 SB_Destroy(sbuffer);
 ```
+
+## Interactive demo / Proof-of-Concept
+
+The project also comes with an interactive demo application serving both as a
+testing ground for the implementation, and a simple visual demonstration of the
+algorithm in action.
+
+For instructions on how you can build and run the demo app, see [here](./demo/README.md).
 
 [^1]: The terms "near-clipping plane", "buffer", and "S-Buffer" can be used
       interchangeably.
