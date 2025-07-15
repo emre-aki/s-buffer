@@ -1344,7 +1344,7 @@ int main (int argc, char** argv)
     // s-buffer itself
     sbuffer_t* sbuffer = SB_Init(BUFFER_W, Z_NEAR, S_BUFFER_MAX_DEPTH);
 
-    /* prepopulate if the optional argument `-p` is passed */
+    /* prepopulate if the optional argument `-pp` is passed */
     if (argc > 1)
     {
         char* arg = *(argv + 1);
