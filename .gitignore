@@ -55,6 +55,7 @@ dkms.conf
 *.xcodeproj*
 .vscode
 .zed
+.clangd
 
 # Output
 sbuffer*
