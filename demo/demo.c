@@ -790,7 +790,7 @@ void DrawAxes (SDL_Renderer* ctx)
 
 void DrawSpan (SDL_Renderer* ctx, span_t* span)
 {
-    /* fill out the "s-buffer representation" */
+    /* fill out the "S-buffer representation" */
     const int screen_x0 = ceil(span->x0 - 0.5);
     const int screen_width = ceil(span->x1 - 0.5) - screen_x0;
     SDL_Rect screen_rect = { screen_x0, WIN_H, screen_width, S_BUFFER_REPR_H };
@@ -802,10 +802,8 @@ void DrawSpan (SDL_Renderer* ctx, span_t* span)
     SDL_RenderFillRect(ctx, &screen_rect);
 
     /* draw the segment in "screen space", i.e., onto the projection plane */
-    DrawLineBresenham(ctx,
-                      span->x0, PROJ_PLANE_Y,
-                      span->x1, PROJ_PLANE_Y,
-                      span->color);
+    screen_rect.y = PROJ_PLANE_Y; screen_rect.h = 1;
+    SDL_RenderFillRect(ctx, &screen_rect);
 }
 
 size_t
@@ -814,7 +812,7 @@ DrawSBufferDfs
   sbuffer_t* sbuffer,
   void (*drawhook) (SDL_Renderer* ctx, span_t* span) )
 {
-    // s-buffer representation
+    /* draw the background for the "S-Buffer representation" */
     SDL_Rect sbuffer_rect = { 0, WIN_H, BUFFER_W, S_BUFFER_REPR_H };
     SDL_SetRenderDrawColor(ctx, 255, 255, 255, 255);
     SDL_RenderFillRect(ctx, &sbuffer_rect);
