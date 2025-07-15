@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include <time.h>
 
@@ -22,6 +23,7 @@
 #define SIGN(x) (((x) >> 31 << 1) + 1)
 #define MIN(a, b) ((((a) <= (b)) * (a)) + (((b) < (a)) * (b)))
 #define CLAMP(x, lo, hi) (MIN(SB_MAX(x, lo), hi))
+#define PX(x, y) (BUFFER_W * (y) + (x))
 
 #define WIN_TITLE "s-buffer"
 
@@ -47,13 +49,15 @@ const size_t BUFFER_W_2 = BUFFER_W >> 1;
 const size_t GRID = 1 << GRID_SIZE;
 byte_t ID = 65;
 
+typedef unsigned int color_t;
+
 typedef struct {
     int x, y;
 } vec2_t;
 
 typedef struct {
     vec2_t src, dst;
-    unsigned int color;
+    color_t color;
 } seg2_t;
 
 typedef struct {
@@ -442,6 +446,11 @@ static const byte_t GLYPH_TABLE[128][FONT_WIDTH * FONT_HEIGHT] = {
     },
 };
 
+// buffer the frame before it's actually drawn to the screen
+color_t framebuffer[BUFFER_W * BUFFER_H] = { 0 };
+const size_t N_PIXELS = BUFFER_W * BUFFER_H;
+
+const size_t FRAMEBUFFER_SIZE = sizeof(framebuffer);
 const size_t SBUFFER_SIZE = sizeof(sbuffer_t);
 const size_t SPAN_SIZE = sizeof(span_t);
 
@@ -486,11 +495,9 @@ CreateWindow
     return window;
 }
 
-SDL_Renderer* CreateCtx (SDL_Window* window)
+SDL_Renderer* CreateCtx (SDL_Window* window, Uint32 flags)
 {
-    SDL_Renderer* ctx = SDL_CreateRenderer(window,
-                                           -1,
-                                           SDL_RENDERER_SOFTWARE);
+    SDL_Renderer* ctx = SDL_CreateRenderer(window, -1, flags);
 
     if (!ctx)
     {
@@ -504,18 +511,28 @@ SDL_Renderer* CreateCtx (SDL_Window* window)
     return ctx;
 }
 
-void Destroy (SDL_Window* window, SDL_Renderer* ctx)
+void Destroy (SDL_Window* window, SDL_Renderer* ctx, SDL_Texture* frame)
 {
     if (ctx) SDL_DestroyRenderer(ctx);
     if (window) SDL_DestroyWindow(window);
+    if (frame) SDL_DestroyTexture(frame);
     SDL_Quit();
 }
 
-void FrameFlush (SDL_Renderer* ctx)
+void FrameFlush (SDL_Renderer* ctx, SDL_Texture* frame)
 {
-    SDL_RenderPresent(ctx);
-    SDL_SetRenderDrawColor(ctx, 0, 0, 0, 0);
-    SDL_RenderClear(ctx);
+    void* pixels; // raw pointer to current frame's pixel data
+    int width;    // how wide a row of pixels is in bytes
+    SDL_LockTexture(frame, 0, &pixels, &width);
+    memcpy(pixels, framebuffer, FRAMEBUFFER_SIZE);
+    memset(framebuffer, 0, FRAMEBUFFER_SIZE);
+    SDL_UnlockTexture(frame);
+    SDL_SetRenderTarget(ctx, 0); // set the `window` as the render target
+    SDL_SetRenderDrawColor(ctx, 0, 0, 0, 0);             // set a clean slate
+    SDL_SetRenderDrawBlendMode(ctx, SDL_BLENDMODE_NONE); // for the new frame we
+    SDL_RenderClear(ctx);                                // are about to render
+    SDL_RenderCopy(ctx, frame, 0, 0); // copy the frame to the `window`
+    SDL_RenderPresent(ctx);           // present the frame to the screen
 }
 
 void GetMouseCoords (int* x, int* y)
@@ -591,7 +608,7 @@ void HandleEventSync (byte_t* do_run, mouse_state_t* ms, byte_t* ks)
     }
 }
 
-int RandomColor ()
+color_t RandomColor ()
 {
     return (rand() & 0xff000000) |
            (rand() & 0xff0000) |
@@ -600,24 +617,33 @@ int RandomColor ()
 }
 
 //
+// PutPixel
+// Put a single pixel at the designated location on the framebuffer with smooth
+// alpha blending
+//
+void PutPixel (int x, int y, color_t color)
+{
+    const int offset = PX(x, y);
+    if (!(0 <= offset && offset < N_PIXELS)) return; // bounds check
+    color_t* px = framebuffer + offset;
+    const color_t buf_color = *px;
+    const byte_t r = (color >> 24) & 0xff, buf_r = (buf_color >> 24) & 0xff;
+    const byte_t g = (color >> 16) & 0xff, buf_g = (buf_color >> 16) & 0xff;
+    const byte_t b = (color >> 8) & 0xff,  buf_b = (buf_color >> 8) & 0xff;
+    const byte_t a = color & 0xff;
+    const float blend = (float) a / 255, blend_inv = 1 - blend;
+    const byte_t new_r = r * blend + buf_r * blend_inv;
+    const byte_t new_g = g * blend + buf_g * blend_inv;
+    const byte_t new_b = b * blend + buf_b * blend_inv;
+    *px = (new_r << 24) | (new_g << 16) | (new_b << 8) | 0xff;
+}
+
+//
 // DrawLineBresenham
 // Why not use `SDL_RenderDrawLine` you degenerate slime!
 //
-void
-DrawLineBresenham
-( SDL_Renderer* ctx,
-  float x0, float y0,
-  float x1, float y1,
-  int color )
+void DrawLineBresenham (float x0, float y0, float x1, float y1, color_t color)
 {
-    byte_t r, g, b, a;
-    SDL_GetRenderDrawColor(ctx, &r, &g, &b, &a);
-    SDL_SetRenderDrawColor(ctx,
-                           (color & 0xff000000) >> 24,
-                           (color & 0xff0000) >> 16,
-                           (color & 0xff00) >> 8,
-                           0xff);
-
     int X0 = ceil(x0 - 0.5), Y0 = ceil(y0 - 0.5);
     int X1 = ceil(x1 - 0.5), Y1 = ceil(y1 - 0.5);
 
@@ -644,7 +670,7 @@ DrawLineBresenham
 
         for (size_t i = 0; i <= delta_x; ++i)
         {
-            SDL_RenderDrawPoint(ctx, x, y);
+            PutPixel(x, y, color);
 
             const int decision = ~(p >> 31);
             p += px + (py & decision);
@@ -669,7 +695,7 @@ DrawLineBresenham
 
         for (size_t i = 0; i <= delta_y; ++i)
         {
-            SDL_RenderDrawPoint(ctx, x, y);
+            PutPixel(x, y, color);
 
             const int decision = ~(p >> 31);
             p += (px & decision) + py;
@@ -677,26 +703,31 @@ DrawLineBresenham
             ++y;
         }
     }
-
-    SDL_SetRenderDrawColor(ctx, r, g, b, a);
 }
 
-void
-FillText
-( SDL_Renderer* ctx,
-  byte_t* str,
-  int x,
-  int y,
-  int scale,
-  int color )
+void FillRect (int x, int y, int width, int height, color_t color)
+{
+    const int clipleft = SB_MAX(-x, 0);
+    const int clipright = SB_MAX(x + width - BUFFER_W, 0);
+    const int cliptop = SB_MAX(-y, 0);
+    const int clipbottom = SB_MAX(y + height - BUFFER_H, 0);
+    const int clipped_w = width - clipleft - clipright;
+    const int clipped_h = height - cliptop - clipbottom;
+    const int sx = x + clipleft, sy = y + cliptop;
+    int xi, yi = sy;
+
+    for (size_t i = 0; i < height; ++i)
+    {
+        xi = sx;
+        for (size_t j = 0; j < width; ++j) PutPixel(xi++, yi, color);
+        ++yi;
+    }
+}
+
+void FillText (byte_t* str, int x, int y, int scale, color_t color)
 {
     const size_t spacing = scale * LETTER_SPACING;
     int px_x = x, px_y = y, g_x = px_x;
-
-    SDL_SetRenderDrawColor(ctx, (color & 0xff000000) >> 24,
-                                (color & 0xff0000) >> 16,
-                                (color & 0xff00) >> 8,
-                                0xff);
 
     for (size_t i = 0; *(str + i); ++i)
     {
@@ -714,13 +745,7 @@ FillText
                 for (size_t c = 0; c < FONT_WIDTH; ++c)
                 {
                     byte_t px = *(glyph + offset++);
-
-                    if (px)
-                    {
-                        SDL_Rect screen_rect = { px_x, px_y, scale, scale };
-                        SDL_RenderFillRect(ctx, &screen_rect);
-                    }
-
+                    if (px) FillRect(px_x, px_y, scale, scale, color);
                     px_x += scale;
                 }
 
@@ -738,17 +763,16 @@ FillText
     }
 }
 
-void DrawGrid (SDL_Renderer* ctx)
+void DrawGrid ()
 {
     const size_t rows = WIN_H >> GRID_SIZE, cols = BUFFER_W >> GRID_SIZE;
     size_t x = 0, y = 0;
-    SDL_SetRenderDrawColor(ctx, 127, 127, 127, 255);
 
     for (size_t r = 0; r < rows; ++r)
     {
         for (size_t c = 0; c < cols; ++c)
         {
-            SDL_RenderDrawPoint(ctx, x, y);
+            PutPixel(x, y, 0x7f7f7fff);
             x += GRID;
         }
 
@@ -757,68 +781,51 @@ void DrawGrid (SDL_Renderer* ctx)
     }
 }
 
-void DrawFrustum (SDL_Renderer* ctx)
+void DrawFrustum ()
 {
-    DrawLineBresenham(ctx,                      //
-                      0, PROJ_PLANE_Y,          // projection plane
+    DrawLineBresenham(0, PROJ_PLANE_Y,          // projection plane
                       BUFFER_W, PROJ_PLANE_Y,   //
                       0xffffffff);
-    DrawLineBresenham(ctx,                      //
-                      0, PROJ_PLANE_Y,          // left "edge"
+    DrawLineBresenham(0, PROJ_PLANE_Y,          // left "edge"
                       BUFFER_W_2, WIN_H,        //
                       0xffffffff);
-    DrawLineBresenham(ctx,                      //
-                      BUFFER_W, PROJ_PLANE_Y,   // right "edge"
+    DrawLineBresenham(BUFFER_W, PROJ_PLANE_Y,   // right "edge"
                       BUFFER_W_2, WIN_H,        //
                       0xffffffff);
-    DrawLineBresenham(ctx,                      //
-                      BUFFER_W_2, PROJ_PLANE_Y, // near distance
+    DrawLineBresenham(BUFFER_W_2, PROJ_PLANE_Y, // near distance
                       BUFFER_W_2, WIN_H,        //
                       0xffffffff);
 }
 
-void DrawAxes (SDL_Renderer* ctx)
+void DrawAxes ()
 {
     const size_t ox = GRID, oy = WIN_H - GRID;
     const size_t x = ox + GRID, z = oy - GRID;
-    DrawLineBresenham(ctx, ox, oy, x, oy, 0xffffffff);                // x-
-    DrawLineBresenham(ctx, x + 5, oy - 2, x + 9, oy + 2, 0xffffffff); // axis
-    DrawLineBresenham(ctx, x + 9, oy - 2, x + 5, oy + 2, 0xffffffff); //
+    DrawLineBresenham(ox, oy, x, oy, 0xffffffff);                //
+    DrawLineBresenham(x + 5, oy - 2, x + 9, oy + 2, 0xffffffff); // x-axis
+    DrawLineBresenham(x + 9, oy - 2, x + 5, oy + 2, 0xffffffff); //
 
-    DrawLineBresenham(ctx, ox, oy, ox, z, 0xffffffff);                //
-    DrawLineBresenham(ctx, ox - 2, z - 9, ox + 2, z - 9, 0xffffffff); // z-
-    DrawLineBresenham(ctx, ox + 2, z - 9, ox - 2, z - 5, 0xffffffff); // axis
-    DrawLineBresenham(ctx, ox - 2, z - 5, ox + 2, z - 5, 0xffffffff); //
+    DrawLineBresenham(ox, oy, ox, z, 0xffffffff);                //
+    DrawLineBresenham(ox - 2, z - 9, ox + 2, z - 9, 0xffffffff); // z-axis
+    DrawLineBresenham(ox + 2, z - 9, ox - 2, z - 5, 0xffffffff); //
+    DrawLineBresenham(ox - 2, z - 5, ox + 2, z - 5, 0xffffffff); //
 }
 
-void DrawSpan (SDL_Renderer* ctx, span_t* span)
+void DrawSpan (span_t* span)
 {
     /* fill out the "S-buffer representation" */
     const int screen_x0 = ceil(span->x0 - 0.5);
     const int screen_width = ceil(span->x1 - 0.5) - screen_x0;
-    SDL_Rect screen_rect = { screen_x0, WIN_H, screen_width, S_BUFFER_REPR_H };
-    SDL_SetRenderDrawColor(ctx,
-                           (span->color & 0xff000000) >> 24,
-                           (span->color & 0xff0000) >> 16,
-                           (span->color & 0xff00) >> 8,
-                           0xff);
-    SDL_RenderFillRect(ctx, &screen_rect);
+    FillRect(screen_x0, WIN_H, screen_width, S_BUFFER_REPR_H, span->color);
 
-    /* draw the segment in "screen space", i.e., onto the projection plane */
-    screen_rect.y = PROJ_PLANE_Y; screen_rect.h = 1;
-    SDL_RenderFillRect(ctx, &screen_rect);
+    // draw the segment in "screen space", i.e., onto the projection plane
+    FillRect(screen_x0, PROJ_PLANE_Y, screen_width, 1, span->color);
 }
 
-size_t
-DrawSBufferDfs
-( SDL_Renderer* ctx,
-  sbuffer_t* sbuffer,
-  void (*drawhook) (SDL_Renderer* ctx, span_t* span) )
+size_t DrawSBufferDfs (sbuffer_t* sbuffer, void (*drawhook) (span_t* span))
 {
-    /* draw the background for the "S-Buffer representation" */
-    SDL_Rect sbuffer_rect = { 0, WIN_H, BUFFER_W, S_BUFFER_REPR_H };
-    SDL_SetRenderDrawColor(ctx, 255, 255, 255, 255);
-    SDL_RenderFillRect(ctx, &sbuffer_rect);
+    // draw the background for the "S-Buffer representation"
+    FillRect(0, WIN_H, BUFFER_W, S_BUFFER_REPR_H, 0xffffffff);
 
     span_t* curr = sbuffer->root;
     dfs_t stack[sbuffer->max_depth + 1];
@@ -856,7 +863,7 @@ DrawSBufferDfs
                 curr = parent->next;
                 (stack + ++sp)->prev_visited = 0;
                 (stack + sp)->next_visited = 0;
-                drawhook(ctx, parent);
+                drawhook(parent);
                 ++count;
             }
         }
@@ -873,7 +880,7 @@ DrawSBufferDfs
 
             curr = parent->next; // try the `next` sub-tree
             (stack + sp - 1)->prev_visited = 0xff;
-            drawhook(ctx, parent);
+            drawhook(parent);
             ++count;
 
             if (curr)
@@ -899,12 +906,7 @@ DrawSBufferDfs
     return count;
 }
 
-void
-DrawSegments
-( SDL_Renderer* ctx,
-  byte_t*       ks,
-  seg2_t*       segs,
-  size_t        seg_head )
+void DrawSegments (byte_t* ks, seg2_t* segs, size_t seg_head)
 {
     /* go over all segments stored in the queue */
     for (size_t i = 0; i < seg_head; ++i)
@@ -913,26 +915,26 @@ DrawSegments
         const seg2_t seg = *(segs + i);
         const vec2_t src = seg.src;
         const vec2_t dst = seg.dst;
-        const int color = seg.color;
-        DrawLineBresenham(ctx, src.x, src.y, dst.x, dst.y, color);
+        const color_t color = seg.color;
+        DrawLineBresenham(src.x, src.y, dst.x, dst.y, color);
 
         /* render projective debug lines */
         if (*(ks + KEY_D))
         {
-            DrawLineBresenham(ctx, src.x, src.y, BUFFER_W_2, WIN_H, color);
-            DrawLineBresenham(ctx, dst.x, dst.y, BUFFER_W_2, WIN_H, color);
+            DrawLineBresenham(src.x, src.y, BUFFER_W_2, WIN_H, color);
+            DrawLineBresenham(dst.x, dst.y, BUFFER_W_2, WIN_H, color);
         }
     }
 }
 
-int Setup (SDL_Window** window, SDL_Renderer** ctx)
+int Setup (SDL_Window** window, SDL_Renderer** ctx, SDL_Texture** frame)
 {
     int res = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
     if (res)
     {
         fprintf(stderr,
                 "[Setup] Initializing SDL failed: %s.\n", SDL_GetError());
-        Destroy(0, 0);
+        Destroy(0, 0, 0);
 
         return 1;
     }
@@ -944,15 +946,30 @@ int Setup (SDL_Window** window, SDL_Renderer** ctx)
                            0);
     if (!*window)
     {
-        Destroy(*window, 0);
+        Destroy(*window, 0, 0);
 
         return 1;
     }
 
-    *ctx = CreateCtx(*window);
+    *ctx = CreateCtx(*window, SDL_RENDERER_ACCELERATED);
     if (!*ctx)
     {
-        Destroy(*window, *ctx);
+        Destroy(*window, *ctx, 0);
+
+        return 1;
+    }
+
+    *frame = SDL_CreateTexture(*ctx,
+                               SDL_PIXELFORMAT_RGBA8888,
+                               SDL_TEXTUREACCESS_STREAMING,
+                               BUFFER_W, BUFFER_H);
+    if (!*frame)
+    {
+        fprintf(stderr,
+                "[Setup] Error while initializing frame: %s.\n",
+                SDL_GetError());
+
+        Destroy(*window, *ctx, *frame);
 
         return 1;
     }
@@ -976,6 +993,7 @@ Update
 ( sbuffer_t*     sbuffer,
   SDL_Window*    window,
   SDL_Renderer*  ctx,
+  SDL_Texture*   frame,
   byte_t*        do_run,
   mouse_state_t* ms,
   byte_t*        ks,
@@ -991,11 +1009,11 @@ Update
     byte_t holding_esc;
     byte_t did_push = 0;
     HandleEventSync(do_run, ms, ks);
-    DrawGrid(ctx);
-    DrawFrustum(ctx);
-    DrawAxes(ctx);
-    DrawSegments(ctx, ks, segs, *seg_head);
-    span_count = DrawSBufferDfs(ctx, sbuffer, DrawSpan);
+    DrawGrid();
+    DrawFrustum();
+    DrawAxes();
+    DrawSegments(ks, segs, *seg_head);
+    span_count = DrawSBufferDfs(sbuffer, DrawSpan);
     holding_esc = *(ks + KEY_ESC);
 
     /* left mouse button is being held down */
@@ -1008,7 +1026,7 @@ Update
         src.y = CLAMP(src.y, 0, PROJ_PLANE_Y);
         dst.x = CLAMP(dst.x, 0, BUFFER_W);
         dst.y = CLAMP(dst.y, 0, PROJ_PLANE_Y);
-        DrawLineBresenham(ctx, src.x, src.y, dst.x, dst.y, 0xff0000ff);
+        DrawLineBresenham(src.x, src.y, dst.x, dst.y, 0xff0000ff);
     }
     /* left mouse button is released */
     else if (!holding_esc && prev_holding_mouse_button && !ms->pressed)
@@ -1068,20 +1086,20 @@ Update
     byte_t strbuf[100];
     sprintf(strbuf, "s-buffer memory: %lu bytes used (%.0f%%)",
             memused, round((float) memused / 32.0f));
-    FillText(ctx, strbuf, 16, 16, 2, 0xff0000ff);
+    FillText(strbuf, 16, 16, 2, 0xff0000ff);
     sprintf(strbuf, "span count     : %lu", span_count);
-    FillText(ctx, strbuf, 16, 32, 2, 0xff0000ff);
+    FillText(strbuf, 16, 32, 2, 0xff0000ff);
     sprintf(strbuf,
             "buffer depth   : %d",
             sbuffer->root ? sbuffer->root->height : 0);
-    FillText(ctx, strbuf, 16, 48, 2, 0xff0000ff);
+    FillText(strbuf, 16, 48, 2, 0xff0000ff);
 
     if (did_push) *disappear_ticks = 250;
 
     if (*disappear_ticks > 0)
     {
         sprintf(strbuf, "push took      : %.3f ms", *push_time_millis);
-        FillText(ctx, strbuf, 16, 64, 2, 0xff0000ff);
+        FillText(strbuf, 16, 64, 2, 0xff0000ff);
         *disappear_ticks = *disappear_ticks - 1;
     }
     else
@@ -1090,7 +1108,7 @@ Update
     }
 
     *seg_head = head;
-    FrameFlush(ctx);
+    FrameFlush(ctx, frame);
 }
 
 /* WARNING: For debugging use only! */
@@ -1333,8 +1351,9 @@ int main (int argc, char** argv)
 {
     SDL_Window* window = 0; // window
     SDL_Renderer* ctx = 0;  // rendering context
+    SDL_Texture* frame = 0; // the current frame rendered into a texture
 
-    int res = Setup(&window, &ctx);
+    int res = Setup(&window, &ctx, &frame);
     if (res) return res;
 
     mouse_state_t ms = { 0, 0, 0 }; // mouse state
@@ -1368,6 +1387,7 @@ int main (int argc, char** argv)
         Update(sbuffer,
                window,
                ctx,
+               frame,
                &do_run,
                &ms,
                ks,
@@ -1381,7 +1401,7 @@ int main (int argc, char** argv)
     printf("---------------------------------------------------------------\n");
 
     SB_Destroy(sbuffer);
-    Destroy(window, ctx);
+    Destroy(window, ctx, frame);
     printf("Goodbye! 🙋‍♂️\n");
 
     return 0;
