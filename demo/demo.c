@@ -678,6 +678,63 @@ DrawLineBresenham
     SDL_SetRenderDrawColor(ctx, r, g, b, a);
 }
 
+void
+FillText
+( SDL_Renderer* ctx,
+  byte_t* str,
+  int x,
+  int y,
+  int scale,
+  int color )
+{
+    const size_t spacing = scale * LETTER_SPACING;
+    int px_x = x, px_y = y, g_x = px_x;
+
+    SDL_SetRenderDrawColor(ctx, (color & 0xff000000) >> 24,
+                                (color & 0xff0000) >> 16,
+                                (color & 0xff00) >> 8,
+                                0xff);
+
+    for (size_t i = 0; *(str + i); ++i)
+    {
+        /* render glyph */
+        byte_t chr = *(str + i);
+        const byte_t* glyph = *(GLYPH_TABLE + chr);
+        size_t offset = 0;
+
+        if (chr != 32)
+        {
+            for (size_t r = 0; r < FONT_HEIGHT; ++r)
+            {
+                px_x = g_x;
+
+                for (size_t c = 0; c < FONT_WIDTH; ++c)
+                {
+                    byte_t px = *(glyph + offset++);
+
+                    if (px)
+                    {
+                        SDL_Rect screen_rect = { px_x, px_y, scale, scale };
+                        SDL_RenderFillRect(ctx, &screen_rect);
+                    }
+
+                    px_x += scale;
+                }
+
+                px_y += scale;
+            }
+        }
+        else
+        {
+            px_x += FONT_WIDTH * scale;
+        }
+
+        px_x += spacing;
+        px_y = y;
+        g_x = px_x;
+    }
+}
+
 void DrawGrid (SDL_Renderer* ctx)
 {
     const size_t rows = WIN_H >> GRID_SIZE, cols = BUFFER_W >> GRID_SIZE;
@@ -867,63 +924,6 @@ DrawSegments
     }
 }
 
-void
-Text
-( SDL_Renderer* ctx,
-  byte_t* str,
-  int x,
-  int y,
-  int scale,
-  int color )
-{
-    const size_t spacing = scale * LETTER_SPACING;
-    int px_x = x, px_y = y, g_x = px_x;
-
-    SDL_SetRenderDrawColor(ctx, (color & 0xff000000) >> 24,
-                                (color & 0xff0000) >> 16,
-                                (color & 0xff00) >> 8,
-                                0xff);
-
-    for (size_t i = 0; *(str + i); ++i)
-    {
-        /* render glyph */
-        byte_t chr = *(str + i);
-        const byte_t* glyph = *(GLYPH_TABLE + chr);
-        size_t offset = 0;
-
-        if (chr != 32)
-        {
-            for (size_t r = 0; r < FONT_HEIGHT; ++r)
-            {
-                px_x = g_x;
-
-                for (size_t c = 0; c < FONT_WIDTH; ++c)
-                {
-                    byte_t px = *(glyph + offset++);
-
-                    if (px)
-                    {
-                        SDL_Rect screen_rect = { px_x, px_y, scale, scale };
-                        SDL_RenderFillRect(ctx, &screen_rect);
-                    }
-
-                    px_x += scale;
-                }
-
-                px_y += scale;
-            }
-        }
-        else
-        {
-            px_x += FONT_WIDTH * scale;
-        }
-
-        px_x += spacing;
-        px_y = y;
-        g_x = px_x;
-    }
-}
-
 int Setup (SDL_Window** window, SDL_Renderer** ctx)
 {
     int res = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
@@ -1066,20 +1066,20 @@ Update
     byte_t strbuf[100];
     sprintf(strbuf, "s-buffer memory: %lu bytes used (%.0f%%)",
             memused, round((float) memused / 32.0f));
-    Text(ctx, strbuf, 16, 16, 2, 0xff0000ff);
+    FillText(ctx, strbuf, 16, 16, 2, 0xff0000ff);
     sprintf(strbuf, "span count     : %lu", span_count);
-    Text(ctx, strbuf, 16, 32, 2, 0xff0000ff);
+    FillText(ctx, strbuf, 16, 32, 2, 0xff0000ff);
     sprintf(strbuf,
             "buffer depth   : %d",
             sbuffer->root ? sbuffer->root->height : 0);
-    Text(ctx, strbuf, 16, 48, 2, 0xff0000ff);
+    FillText(ctx, strbuf, 16, 48, 2, 0xff0000ff);
 
     if (did_push) *disappear_ticks = 250;
 
     if (*disappear_ticks > 0)
     {
         sprintf(strbuf, "push took      : %.3f ms", *push_time_millis);
-        Text(ctx, strbuf, 16, 64, 2, 0xff0000ff);
+        FillText(ctx, strbuf, 16, 64, 2, 0xff0000ff);
         *disappear_ticks = *disappear_ticks - 1;
     }
     else
