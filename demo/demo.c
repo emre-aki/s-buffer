@@ -938,7 +938,7 @@ int Setup (SDL_Window** window, SDL_Renderer** ctx)
                            SDL_WINDOWPOS_CENTERED,
                            BUFFER_W, BUFFER_H,
                            0);
-    if (!window)
+    if (!*window)
     {
         Destroy(*window, 0);
 
@@ -946,7 +946,7 @@ int Setup (SDL_Window** window, SDL_Renderer** ctx)
     }
 
     *ctx = CreateCtx(*window);
-    if (!ctx)
+    if (!*ctx)
     {
         Destroy(*window, *ctx);
 
