@@ -476,7 +476,9 @@ CreateWindow
 
     if (!window)
     {
-        printf("[CreateWindow] Could not create window!: %s\n", SDL_GetError());
+        fprintf(stderr,
+                "[CreateWindow] Could not create window!: %s\n",
+                SDL_GetError());
 
         return 0;
     }
@@ -492,8 +494,9 @@ SDL_Renderer* CreateCtx (SDL_Window* window)
 
     if (!ctx)
     {
-        printf("[CreateCtx] Error while creating a rendering context: %s\n",
-               SDL_GetError());
+        fprintf(stderr,
+                "[CreateCtx] Error while creating a rendering context: %s\n",
+                SDL_GetError());
 
         return 0;
     }
@@ -927,7 +930,8 @@ int Setup (SDL_Window** window, SDL_Renderer** ctx)
     int res = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
     if (res)
     {
-        printf("[Setup] Initializing SDL failed: %s.\n", SDL_GetError());
+        fprintf(stderr,
+                "[Setup] Initializing SDL failed: %s.\n", SDL_GetError());
         Destroy(0, 0);
 
         return 1;
