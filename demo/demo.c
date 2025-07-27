@@ -61,11 +61,6 @@ typedef struct {
 } seg2_t;
 
 typedef struct {
-    span_t* span;
-    byte_t prev_visited, next_visited;
-} dfs_t;
-
-typedef struct {
     int x, y;
     byte_t pressed;
 } mouse_state_t;
@@ -811,7 +806,7 @@ void DrawAxes ()
     DrawLineBresenham(ox - 2, z - 5, ox + 2, z - 5, 0xffffffff); //
 }
 
-void DrawSpan (span_t* span)
+void DrawSpan (const span_t* span)
 {
     /* fill out the "S-buffer representation" */
     const int screen_x0 = ceil(span->x0 - 0.5);
@@ -822,84 +817,65 @@ void DrawSpan (span_t* span)
     FillRect(screen_x0, PROJ_PLANE_Y, screen_width, 1, span->color);
 }
 
-size_t DrawSBufferDfs (sbuffer_t* sbuffer, void (*drawhook) (span_t* span))
+size_t
+DrawSBufferDfs
+( sbuffer_t* sbuffer,
+  void       (*drawhook) (const span_t* span) )
 {
     // draw the background for the "S-Buffer representation"
     FillRect(0, WIN_H, BUFFER_W, S_BUFFER_REPR_H, 0xffffffff);
 
-    span_t* curr = sbuffer->root;
-    dfs_t stack[sbuffer->max_depth + 1];
-    int sp = 0;
+    const size_t size = sbuffer->max_depth + 1;
+    const span_t* stack[size];
+    byte_t bookmarks[size]; // store "where we left off" for each non-leaf span
+    const span_t* curr = sbuffer->root;
     size_t count = 0;
-    memset(stack, 0, sizeof(stack));
+    int sp = 0; // stack pointer
+    int cp = 0; // child pointer -> 0: prev, 1: next
 
     while (curr)
     {
-        span_t* parent;
+        SB_ASSERT(sp < size, "[DrawSBufferDfs] Max buffer depth reached!\n");
 
-        if ((stack + sp)->prev_visited)
+        *(stack + sp) = curr;
+        *(bookmarks + sp++) = cp;
+
+        if (!cp && curr->prev)
         {
-            if ((stack + sp)->next_visited)
-            {
-                if (sp-- > 0)
-                {
-                    dfs_t* grandparent = stack + sp;
+            curr = curr->prev;
+        }
+        else if (cp < 2 && curr->next)
+        {
+            ++count;
+            drawhook(curr);
 
-                    if (curr->x0 < grandparent->span->x0)
-                        grandparent->prev_visited = 0xff;
-                    else
-                        grandparent->next_visited = 0xff;
-
-                    curr = grandparent->span;
-                }
-                else
-                {
-                    curr = 0;
-                }
-            }
-            else
+            curr = curr->next;
+            *(bookmarks + sp - 1) = 1; // update parent's bookmark to `next`
+            cp = 0; // reset child pointer as we're about to enter a new subtree
+        }
+        /* either we've already visited both children, or we hit a leaf node.
+         * either way, walk back one step up the stack.
+         */
+        else if (--sp > 0)
+        {
+            if (!curr->next)
             {
-                parent = curr;
-                curr = parent->next;
-                (stack + ++sp)->prev_visited = 0;
-                (stack + sp)->next_visited = 0;
-                drawhook(parent);
                 ++count;
+                drawhook(curr);
             }
+
+            curr = *(stack + --sp);
+            cp = *(bookmarks + sp) + 1; // carry on with the `next` span
         }
         else
         {
-            while (curr)
-            {
-                parent = curr;
-                curr = parent->prev;
-                (stack + sp)->span = parent;
-                (stack + sp)->prev_visited = 0;
-                (stack + sp++)->next_visited = 0;
-            }
+            if (!curr->next)    //
+            {                   // we need to account for cases where the
+                ++count;        // S-Buffer only has a single `prev` child
+                drawhook(curr); // and a maximum depth of one
+            }                   //
 
-            curr = parent->next; // try the `next` sub-tree
-            (stack + sp - 1)->prev_visited = 0xff;
-            drawhook(parent);
-            ++count;
-
-            if (curr)
-            {                                   // have to reset the "next"
-                (stack + sp)->prev_visited = 0; // position in the stack as the
-                (stack + sp)->next_visited = 0; // next iteration relies on its
-            }                                   // up-to-date value
-        }
-
-        if (!curr && --sp > 0) // reached a leaf node, need to backtrack
-        {
-            dfs_t* grandparent = stack + --sp;
-
-            if (parent->x0 < grandparent->span->x0)
-                grandparent->prev_visited = 0xff;
-            else
-                grandparent->next_visited = 0xff;
-
-            curr = grandparent->span;
+            curr = 0; // exit condition
         }
     }
 
@@ -1209,60 +1185,60 @@ void Prepopulate (sbuffer_t* sbuffer, seg2_t* segs, size_t* seg_head)
     // };
 
     /* [✅] Improper balancing + height issue */
-    const size_t prepop_segs_count = 38;
+    // const size_t prepop_segs_count = 38;
     // const size_t prepop_segs_count = 11;
-    seg2_t prepop_segs[] = {
-        { { 128, 192 }, { 512, 176 }, 1999622655 },
-        { { 512, 160 }, { 704, 304 }, 222632191 },
-        { { 112, 160 }, { 224, 384 }, 126026751 },
-        { { 224, 368 }, { 528, 256 }, 1738702591 },
-        { { 480, 208 }, { 576, 272 }, 1904414463 },
-        { { 480, 288 }, { 560, 256 }, 417136639 },
-        { { 368, 272 }, { 464, 336 }, 1968892415 },
-        { { 272, 320 }, { 368, 336 }, 1049337087 },
-        { { 352, 320 }, { 336, 352 }, 802506495 },
-        { { 400, 320 }, { 480, 304 }, 503319551 },
-        { { 448, 256 }, { 544, 304 }, 738634239 },
-        { { 656, 224 }, { 560, 336 }, 71643135 },
-        { { 464, 304 }, { 592, 320 }, 2027184639 },
-        { { 272, 336 }, { 272, 368 }, 1895877887 },
-        { { 96, 512 }, { 768, 432 }, 653422591 },
-        { { 592, 432 }, { 336, 528 }, 1980339711 },
-        { { 208, 480 }, { 256, 528 }, 1309147903 },
-        { { 112, 560 }, { 496, 592 }, 690147839 },
-        { { 624, 512 }, { 336, 608 }, 612906239 },
-        { { 480, 544 }, { 544, 576 }, 1832711423 },
-        { { 256, 544 }, { 320, 592 }, 1050939391 },
-        { { 416, 560 }, { 480, 576 }, 848152063 },
-        { { 448, 576 }, { 464, 608 }, 1120121343 },
-        { { 480, 576 }, { 480, 608 }, 413118207 },
-        { { 352, 560 }, { 352, 592 }, 1484700671 },
-        { { 192, 544 }, { 240, 576 }, 1190558207 },
-        { { 112, 608 }, { 592, 624 }, 726333183 },
-        { { 432, 608 }, { 480, 640 }, 361439999 },
-        { { 480, 624 }, { 448, 640 }, 655218943 },
-        { { 560, 608 }, { 560, 640 }, 98926847 },
-        { { 224, 608 }, { 272, 640 }, 1648942847 },
-        { { 160, 608 }, { 208, 624 }, 669363967 },
-        { { 240, 624 }, { 304, 624 }, 1344599551 },
-        { { 160, 624 }, { 224, 624 }, 2097489919 },
-        { { 128, 592 }, { 176, 624 }, 423063039 },
-        { { 176, 624 }, { 192, 640 }, 1621593343 },
-        { { 256, 608 }, { 336, 656 }, 637184767 },
-        { { 416, 608 }, { 416, 640 }, 2039061247 }
-        //
-        // { { 368, 80 }, { 576, 80 }, 2019175679 },
-        // { { 368, 176 }, { 576, 64 }, 63840255 },
-        // { { 192, 144 }, { 592, 192 }, 927213823 },
-        // { { 384, 96 }, { 512, 192 }, 545370623 },
-        // { { 384, 208 }, { 512, 160 }, 287587839 },
-        // { { 272, 144 }, { 416, 176 }, 1072269055 },
-        // { { 272, 96 }, { 272, 192 }, 1410547455 },
-        // { { 192, 112 }, { 288, 160 }, 1208276223 },
-        // { { 352, 192 }, { 448, 208 }, 1642625279 },
-        // { { 432, 176 }, { 448, 208 }, 861744895 },
-        // { { 416, 192 }, { 432, 224 }, 1148353279 }
-    };
+    // seg2_t prepop_segs[] = {
+    //     { { 128, 192 }, { 512, 176 }, 1999622655 },
+    //     { { 512, 160 }, { 704, 304 }, 222632191 },
+    //     { { 112, 160 }, { 224, 384 }, 126026751 },
+    //     { { 224, 368 }, { 528, 256 }, 1738702591 },
+    //     { { 480, 208 }, { 576, 272 }, 1904414463 },
+    //     { { 480, 288 }, { 560, 256 }, 417136639 },
+    //     { { 368, 272 }, { 464, 336 }, 1968892415 },
+    //     { { 272, 320 }, { 368, 336 }, 1049337087 },
+    //     { { 352, 320 }, { 336, 352 }, 802506495 },
+    //     { { 400, 320 }, { 480, 304 }, 503319551 },
+    //     { { 448, 256 }, { 544, 304 }, 738634239 },
+    //     { { 656, 224 }, { 560, 336 }, 71643135 },
+    //     { { 464, 304 }, { 592, 320 }, 2027184639 },
+    //     { { 272, 336 }, { 272, 368 }, 1895877887 },
+    //     { { 96, 512 }, { 768, 432 }, 653422591 },
+    //     { { 592, 432 }, { 336, 528 }, 1980339711 },
+    //     { { 208, 480 }, { 256, 528 }, 1309147903 },
+    //     { { 112, 560 }, { 496, 592 }, 690147839 },
+    //     { { 624, 512 }, { 336, 608 }, 612906239 },
+    //     { { 480, 544 }, { 544, 576 }, 1832711423 },
+    //     { { 256, 544 }, { 320, 592 }, 1050939391 },
+    //     { { 416, 560 }, { 480, 576 }, 848152063 },
+    //     { { 448, 576 }, { 464, 608 }, 1120121343 },
+    //     { { 480, 576 }, { 480, 608 }, 413118207 },
+    //     { { 352, 560 }, { 352, 592 }, 1484700671 },
+    //     { { 192, 544 }, { 240, 576 }, 1190558207 },
+    //     { { 112, 608 }, { 592, 624 }, 726333183 },
+    //     { { 432, 608 }, { 480, 640 }, 361439999 },
+    //     { { 480, 624 }, { 448, 640 }, 655218943 },
+    //     { { 560, 608 }, { 560, 640 }, 98926847 },
+    //     { { 224, 608 }, { 272, 640 }, 1648942847 },
+    //     { { 160, 608 }, { 208, 624 }, 669363967 },
+    //     { { 240, 624 }, { 304, 624 }, 1344599551 },
+    //     { { 160, 624 }, { 224, 624 }, 2097489919 },
+    //     { { 128, 592 }, { 176, 624 }, 423063039 },
+    //     { { 176, 624 }, { 192, 640 }, 1621593343 },
+    //     { { 256, 608 }, { 336, 656 }, 637184767 },
+    //     { { 416, 608 }, { 416, 640 }, 2039061247 }
+    //     //
+    //     // { { 368, 80 }, { 576, 80 }, 2019175679 },
+    //     // { { 368, 176 }, { 576, 64 }, 63840255 },
+    //     // { { 192, 144 }, { 592, 192 }, 927213823 },
+    //     // { { 384, 96 }, { 512, 192 }, 545370623 },
+    //     // { { 384, 208 }, { 512, 160 }, 287587839 },
+    //     // { { 272, 144 }, { 416, 176 }, 1072269055 },
+    //     // { { 272, 96 }, { 272, 192 }, 1410547455 },
+    //     // { { 192, 112 }, { 288, 160 }, 1208276223 },
+    //     // { { 352, 192 }, { 448, 208 }, 1642625279 },
+    //     // { { 432, 176 }, { 448, 208 }, 861744895 },
+    //     // { { 416, 192 }, { 432, 224 }, 1148353279 }
+    // };
 
     /* [✅] Improper balancing issue:
      * Turns out not an actual issue, just early verification following parent
@@ -1316,6 +1292,76 @@ void Prepopulate (sbuffer_t* sbuffer, seg2_t* segs, size_t* seg_head)
     //     { { 560, 400 }, { 448, 368 }, 1753826559 }, // <- (i=33, infinite loop-inducing scheiße)
     //     { { 430, 704 }, { 438, 704 }, 4278190335 }  // <- (i=34, remaining=5.56756592, `bookmark_index` shenanigans)
     // };
+
+    /* [✅] Just looks like a cool test case */
+    // const size_t prepop_segs_count = 6;
+    // const seg2_t prepop_segs[] = {
+    //     { { 240, 192 }, { 640, 144 }, 1795065599 },
+    //     { { 624, 144 }, { 704, 368 }, 1981676799 },
+    //     { { 352, 160 }, { 768, 288 }, 1796915967 },
+    //     { { 496, 112 }, { 528, 272 }, 68866815 },
+    //     { { 528, 272 }, { 736, 192 }, 1405030143 },
+    //     { { 496, 240 }, { 576, 272 }, 1563281407 }
+    // };
+
+    /* [✅] True z-fighting/line segment rendering issue */
+    // const size_t prepop_segs_count = 4;
+    // const size_t prepop_segs_count = 26;
+    // const seg2_t prepop_segs[] = {
+    //     { { 352, 128 }, { 640, 224 }, 282209535 },
+    //     { { 608, 144 }, { 592, 352 }, 1839429119 },
+    //     { { 336, 240 }, { 736, 368 }, 256620543 },
+    //     { { 480, 112 }, { 304, 336 }, 1645256447 },
+    //     // { { 288, 160 }, { 784, 304 }, 81875967 },
+    //     { { 144, 256 }, { 624, 416 }, 1592838655 },
+    //     { { 208, 592 }, { 688, 336 }, 1151996927 },
+    //     { { 176, 400 }, { 576, 464 }, 70198527 },
+    //     { { 192, 448 }, { 432, 512 }, 1510873855 },
+    //     { { 352, 560 }, { 448, 512 }, 1972694527 },
+    //     { { 192, 512 }, { 400, 544 }, 1675341567 },
+    //     { { 288, 560 }, { 368, 560 }, 1916092671 },
+    //     { { 256, 592 }, { 384, 576 }, 462108415 },
+    //     { { 256, 592 }, { 320, 592 }, 1969840639 },
+    //     { { 272, 608 }, { 288, 608 }, 1829054719 },
+    //     { { 272, 624 }, { 288, 624 }, 1179555839 },
+    //     { { 160, 608 }, { 416, 592 }, 2069492223 },
+    //     { { 192, 672 }, { 368, 608 }, 1814244863 },
+    //     { { 272, 640 }, { 320, 640 }, 1556321791 },
+    //     { { 304, 672 }, { 352, 656 }, 123926271 },
+    //     { { 288, 672 }, { 304, 656 }, 580613631 },
+    //     { { 288, 656 }, { 656, 704 }, 1552068351 },
+    //     { { 304, 688 }, { 400, 688 }, 817736959 },
+    //     { { 576, 560 }, { 752, 704 }, 21412351 },
+    //     { { 176, 688 }, { 352, 688 }, 1910869503 },
+    //     { { 288, 688 }, { 320, 688 }, 777206783 },
+    //     { { 320, 688 }, { 432, 704 }, 1869469951 }
+    //     // { { 304, 688 }, { 400, 688 }, 817736959 },
+    //     // { { 288, 688 }, { 320, 688 }, 777206783 },
+    //     // { { 320, 688 }, { 432, 704 }, 1869469951 }
+    // };
+
+    // future me: I guess this means "reset stack pointer" 🤨
+    /* [✅] rsp test */
+    // const size_t prepop_segs_count = 7;
+    // const seg2_t prepop_segs[] = {
+    //     { { 400, 192 }, { 480, 192 }, 1082740223 },
+    //     { { 624, 224 }, { 672, 224 }, 62765311 },
+    //     { { 256, 240 }, { 320, 240 }, 732818431 },
+    //     { { 528, 272 }, { 560, 272 }, 231570943 },
+    //     { { 704, 272 }, { 752, 272 }, 2010048511 },
+    //     { { 128, 304 }, { 192, 304 }, 864395263 },
+    //     { { 160, 320 }, { 176, 320 }, 1207117055 }
+    // };
+
+    /* [✅] rsp/bisect test */
+    const size_t prepop_segs_count = 5;
+    seg2_t prepop_segs[] = {
+        { { 352, 304 }, { 464, 304 }, 1769826559 },
+        { { 208, 336 }, { 272, 336 }, 1775115007 },
+        { { 512, 336 }, { 592, 336 }, 202664191 },
+        { { 80, 368 }, { 144, 368 }, 657017087 },
+        { { 240, 352 }, { 256, 352 }, 34623743 }
+    };
 
     for (int i = 0; i < prepop_segs_count; ++i)
     {
