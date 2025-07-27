@@ -716,10 +716,10 @@ void FillRect (int x, int y, int width, int height, color_t color)
     const int sx = x + clipleft, sy = y + cliptop;
     int xi, yi = sy;
 
-    for (size_t i = 0; i < height; ++i)
+    for (int i = 0; i < height; ++i)
     {
         xi = sx;
-        for (size_t j = 0; j < width; ++j) PutPixel(xi++, yi, color);
+        for (int j = 0; j < width; ++j) PutPixel(xi++, yi, color);
         ++yi;
     }
 }
