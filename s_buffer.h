@@ -37,6 +37,11 @@
 #define s_buffer_h_SB_Print SB_Print
 #define s_buffer_h_SB_Destroy SB_Destroy
 
+#define SB_REPR_LEFT "├"
+#define SB_REPR_RIGHT "└"
+#define SB_REPR_ARM0 "│"
+#define SB_REPR_ARM1 "─"
+
 #define SB_INTERSECTING 0x0
 #define SB_PARALLEL 0x1
 #define SB_DEGENERATE 0x2
@@ -479,7 +484,7 @@ SB_BisectParent
     const int old_parent_color = parent->color;
     span_t* parent_split;
 
-    /* override the `parent` with the visible portion of the `span` */
+    /* override the `parent` with the visible portion of the new `span` */
     parent->x0 = visx0; parent->x1 = visx1;
     parent->w0 = SB_LERP(w0, w1, visx0 - x0, size);
     parent->w1 = SB_LERP(w0, w1, visx1 - x0, size);
@@ -1149,16 +1154,6 @@ SB_Push
     return 0;
 }
 
-static void _SB_Dump (span_t* span, size_t depth)
-{
-    size_t indent = depth << 2;
-    for (size_t i = 0; i < indent; ++i) printf(" ");
-    printf("[%c] [BF=%d] [H=%d] [%.3f, %.3f)\n",
-           span->id, SB_BF(span) , span->height, span->x0, span->x1);
-    if (span->prev) _SB_Dump(span->prev, depth + 1);
-    if (span->next) _SB_Dump(span->next, depth + 1);
-}
-
 //
 // SB_Dump
 // Dump the spans in the buffer to `stdout` in a tree-like structure to help in
@@ -1169,15 +1164,85 @@ static void _SB_Dump (span_t* span, size_t depth)
 //
 void SB_Dump (sbuffer_t* sbuffer)
 {
-    span_t* root = sbuffer->root;
-    if (!root)
+    if (!sbuffer->root)
     {
         printf("[SB_Dump] Empty S-Buffer!\n");
 
         return;
     }
 
-    _SB_Dump(root, 0);
+    const size_t size = sbuffer->max_depth + 1;
+    const span_t* curr = sbuffer->root;
+    const span_t* stack[size];
+    byte_t bookmarks[size];
+    byte_t visited[size];
+    byte_t has_right_sibling[size];
+    int sp = 0; // stack pointer
+    int cp = 0; // child pointer
+
+    *visited = 0;
+    *has_right_sibling = 0;
+
+    while (curr)
+    {
+        const byte_t previously_visited = *(visited + sp);
+        *(stack + sp) = curr;
+        *(bookmarks + sp) = cp;
+        *(visited + sp++) = 0xff;
+
+        if (!previously_visited)
+        {
+            const size_t self = sp - 1;
+
+            if (self) printf(" ");
+
+            for (size_t i = 1; i < self; ++i)
+            {
+                 if (*(has_right_sibling + i)) printf("%s  ", SB_REPR_ARM0);
+                 else printf("   ");
+            }
+
+            if (self)
+            {
+                if (*(bookmarks + self - 1) || !(*(stack + self - 1))->next)
+                    printf(SB_REPR_RIGHT);
+                else
+                    printf(SB_REPR_LEFT);
+
+                printf(SB_REPR_ARM1);
+            }
+
+            printf("[%c] [BF=%d] [H=%d] [%.3f, %.3f)\n",
+                   curr->id, SB_BF(curr), curr->height, curr->x0, curr->x1);
+        }
+
+        if (!cp && curr->prev)
+        {
+            *(visited + sp) = 0; // mark this child as not yet visited
+            *(has_right_sibling + sp) = !!curr->next;
+            curr = curr->prev;
+        }
+        else if (cp < 2 && curr->next)
+        {
+            cp = 0; // reset child pointer as we're about to enter a new subtree
+            *(bookmarks + sp - 1) = 1; // update parent's bookmark to `next`
+            *(visited + sp) = 0; // mark this child as not yet visited
+            *(has_right_sibling + sp) = 0; // because it's the `next` child
+            curr = curr->next;
+        }
+        /* either we've already visited both children, or we hit a leaf node.
+         * either way, walk back one step up the stack.
+         */
+        else if (--sp > 0)
+        {
+            curr = *(stack + --sp);
+            cp = *(bookmarks + sp) + 1; // carry on with the `next` span
+        }
+        else
+        {
+            curr = 0;
+        }
+    }
 }
 
 static void _SB_Print (span_t* span, byte_t* buffer)

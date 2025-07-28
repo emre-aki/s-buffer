@@ -849,9 +849,9 @@ DrawSBufferDfs
             ++count;
             drawhook(curr);
 
-            curr = curr->next;
-            *(bookmarks + sp - 1) = 1; // update parent's bookmark to `next`
             cp = 0; // reset child pointer as we're about to enter a new subtree
+            *(bookmarks + sp - 1) = 1; // update parent's bookmark to `next`
+            curr = curr->next;
         }
         /* either we've already visited both children, or we hit a leaf node.
          * either way, walk back one step up the stack.
