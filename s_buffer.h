@@ -92,7 +92,7 @@ SB_Push
   float  x0, float x1,
   float  w0, float w1,
   byte_t id,
-  int color );
+  int    color );
 
 void SB_Dump (sbuffer_t* sbuffer);
 void SB_Print (sbuffer_t* sbuffer);
@@ -659,16 +659,20 @@ SB_Push
             const float w = SB_LERP(w0, w1, x - x0, size);
 
             float intersection, leftness;
-            const byte_t not_intersecting = SB_SpanIntersect(
-                x, w,
-                x1, w1,
-                parent->x0, parent->w0,
-                parent->x1, parent->w1,
-                sbuffer->size,
-                sbuffer->z_near,
-                &intersection,
-                &leftness
-            );
+            byte_t not_intersecting = SB_DEGENERATE;
+            if (id == parent->id) // 😩 good lord, enough already with these
+                leftness = 0;     // epsilon problems -- gotta skip on those
+            else                  // self-intersections
+                not_intersecting = SB_SpanIntersect(
+                    x, w,
+                    x1, w1,
+                    parent->x0, parent->w0,
+                    parent->x1, parent->w1,
+                    sbuffer->size,
+                    sbuffer->z_near,
+                    &intersection,
+                    &leftness
+                );
 
             if (x < parent->x0)
             {
