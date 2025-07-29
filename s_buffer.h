@@ -66,7 +66,7 @@
 typedef unsigned char byte_t;
 
 typedef struct span {
-    struct span *prev, *next; // pointers to left and right subtrees
+    struct span *prev, *next; // pointers to left & right subtrees, respectively
     float        x0,    x1;   // start and end endpoints in screen space
     float        w0,    w1;   // reciprocal depths associated with each endpoint
     int          height;      // how tall is this span?
@@ -80,6 +80,20 @@ typedef struct {
     float   z_near;    // distance from the eye to the near-clipping plane
     size_t  max_depth; // the maximum depth the root span is allowed to grow to
 } sbuffer_t;
+
+typedef struct {
+    float x, z;
+} span2_t;
+
+//
+// (p)ush scope
+// Stores context across span pushes -- useful when clipping spans or
+// backtracking through the S-Buffer, among many other use cases.
+//
+typedef struct {
+    span_t* span;
+    float   left, right; // left and right extremities of the current 'push call'
+} pscope_t;
 
 //
 // SB_Falmeq
@@ -136,10 +150,6 @@ sbuffer_t* SB_Init (int size, float z_near, size_t max_depth)
 
     return sbuffer;
 }
-
-typedef struct {
-    float x, z;
-} span2_t;
 
 //
 // SB_Intersect2D
@@ -242,21 +252,208 @@ SB_SpanIntersect
     return res;
 }
 
+/* TODO: find a way to reuse this subroutine in the balancing portion of
+ * `SB_Push` as well
+ */
+//
+// SB_BalanceAdHoc
+// Rebalance the sub-tree pointed at by `bookmark` inside the `stack` if needed.
+// Update the current values of `bookmark` and `depth` after having done the
+// balancing so the push routine can carry on.
+// Should be called immediately after `SB_PushAdhoc`.
+//
+static
+void
+SB_BalanceAdHoc
+( sbuffer_t* sbuffer,
+  pscope_t* stack,
+  int* bookmark,
+  int* depth )
+{
+    const int bookmark_idx = *bookmark, sp = *depth;
+    const span_t* bookmark_span = (stack + bookmark_idx)->span;
+    int imbalance_idx = -1, imbalance_factor;
+    int stack_depth = sp - 1;
+
+    *depth = bookmark_idx + 1; // restoring the original bookmark back for those
+                               // cases where a re-balance is not necessary
+
+    for (size_t i = 0; i < sp; ++i)
+    {
+        if (imbalance_idx >= 0) break;
+
+        span_t* span = (stack + stack_depth)->span;
+        imbalance_factor = SB_BF(span);
+
+        if (imbalance_factor < -1 || imbalance_factor > 1)
+            imbalance_idx = stack_depth;
+        else
+            span->height = SB_HEIGHT(span);
+
+        --stack_depth;
+    }
+
+    if (imbalance_idx < 0) return;
+
+    span_t* old_parent = (stack + imbalance_idx)->span;
+    span_t *new_parent, *child;
+
+    if (imbalance_factor < 0)
+    {
+        new_parent = old_parent->prev;
+        child = new_parent->prev;
+
+        if (SB_BF(new_parent) > 0) // need to do a double-rotation
+        {
+            child = new_parent;
+            new_parent = child->next;
+            child->next = new_parent->prev;
+            new_parent->prev = child;
+        }
+
+        old_parent->prev = new_parent->next;
+        new_parent->next = old_parent;
+    }
+    else
+    {
+        new_parent = old_parent->next;
+        child = new_parent->next;
+
+        if (SB_BF(new_parent) < 0) // need to do a double-rotation
+        {
+            child = new_parent;
+            new_parent = child->prev;
+            child->prev = new_parent->next;
+            new_parent->next = child;
+        }
+
+        old_parent->next = new_parent->prev;
+        new_parent->prev = old_parent;
+    }
+
+    old_parent->height = SB_HEIGHT(old_parent);
+    child->height = SB_HEIGHT(child);
+    new_parent->height = SB_HEIGHT(new_parent);
+
+    if (imbalance_idx)
+    {
+        span_t* imbalance_parent = (stack + imbalance_idx - 1)->span;
+
+        if (new_parent->x0 < imbalance_parent->x0)
+            imbalance_parent->prev = new_parent;
+        else
+            imbalance_parent->next = new_parent;
+    }
+    else
+    {
+        sbuffer->root = new_parent;
+    }
+
+    if (bookmark_idx < imbalance_idx) return;
+
+    float new_left = 0, new_right = sbuffer->size;
+    stack_depth = imbalance_idx;
+
+    if (stack_depth)
+    {
+        pscope_t parent_scope = *(stack + stack_depth - 1);
+        span_t* parent_span = parent_scope.span;
+        new_left = parent_scope.left;
+        new_right = parent_scope.right;
+        if (new_parent->x0 < parent_span->x0) new_right = parent_span->x0;
+        else new_left = parent_span->x1;
+    }
+
+    /* re-construct the stack after re-balancing, unless the bookmark appears
+     * higher up in the stack than where the imbalance has occurred
+     */
+    for (span_t* span = new_parent; span; ++stack_depth)
+    {
+        pscope_t scope = { span, new_left, new_right };
+        *(stack + stack_depth) = scope;
+
+        if (span == bookmark_span) break;
+
+        if (bookmark_span->x0 < span->x0)
+        {
+            new_right = span->x0;
+            span = span->prev;
+        }
+        else
+        {
+            new_left = span->x1;
+            span = span->next;
+        }
+    }
+
+    *bookmark = stack_depth;
+    *depth = stack_depth + 1;
+}
+
+
+//
+// SB_PushAdHoc
+// Push the given `split` immediately onto the S-Buffer, below the given `span`.
+// Used as part of parent bisection subroutine.
+//
+static void SB_PushAdHoc
+( span_t* span,
+  span_t* split,
+  pscope_t* stack,
+  int* depth )
+{
+    int new_depth = *depth - 1;
+    pscope_t* initial_scope = stack + new_depth;
+    float left = initial_scope->left, right = initial_scope->right;
+    span_t* curr = span, *parent;
+
+    while (curr)
+    {
+        parent = curr;
+        pscope_t scope = { parent, left, right };
+        *(stack + new_depth++) = scope;
+
+        if (split->x0 < parent->x0)
+        {
+            right = parent->x0;
+            curr = parent->prev;
+        }
+        else
+        {
+            left = parent->x1;
+            curr = parent->next;
+        }
+    }
+
+    if (split->x0 < parent->x0) parent->prev = split;
+    else parent->next = split;
+
+    *depth = new_depth;
+}
+
 //
 // SB_BisectParent
 // Bisect the `parent` due to being obscured by another span that lies partially
 // or completely in front of it.
 //
+// Updates the `depth` argument accordingly after having pushed (and
+// potentially balanced) the bisected parent back into the buffer, so that the
+// main push routine can take over and continue.
+//
 static
 void
 SB_BisectParent
-( span_t* parent,
-  float   x0,    float x1,
-  float   w0,    float w1,
-  float   visx0, float visx1,
-  byte_t  id,
-  int     color )
+( sbuffer_t* sbuffer,
+  pscope_t*  stack,
+  span_t*    parent,
+  float      x0,    float x1,
+  float      w0,    float w1,
+  float      visx0, float visx1,
+  byte_t     id,
+  int        color,
+  int*       depth )
 {
+    const int rsp = *depth; int bookmark = rsp - 1;
     const float size = x1 - x0;
     const float old_parent_size = parent->x1 - parent->x0;
     const float old_parent_x0 = parent->x0, old_parent_x1 = parent->x1;
@@ -279,34 +476,9 @@ SB_BisectParent
                                                   old_parent_size),
                            old_parent_id,
                            old_parent_color);
-    parent_split->prev = parent->prev;
-    parent->prev = parent_split;
-    if (SB_BF(parent_split) < -1)  // balance the left bisection if necessary
-    {
-        span_t* old_parent = parent_split;
-        span_t* new_parent = parent_split->prev;
-        span_t* child = new_parent->prev;
 
-        if (SB_BF(new_parent) > 0) // need to do a double-rotation
-        {
-            child = new_parent;
-            new_parent = child->next;
-            child->next = new_parent->prev;
-            new_parent->prev = child;
-        }
-
-        old_parent->prev = new_parent->next;
-        new_parent->next = old_parent;
-        parent->prev = new_parent;
-        /* update the heights of the spans affected by the balancing */
-        old_parent->height = SB_HEIGHT(old_parent);
-        child->height = SB_HEIGHT(child);
-        new_parent->height = SB_HEIGHT(new_parent);
-    }
-    else
-    {
-        parent_split->height = SB_HEIGHT(parent_split);
-    }
+    SB_PushAdHoc(parent, parent_split, stack, depth);
+    SB_BalanceAdHoc(sbuffer, stack, &bookmark, depth);
 
     /* insert the right bisection of the parent immediately to the right */
     parent_split = SB_Span(visx1, old_parent_x1,
@@ -316,43 +488,17 @@ SB_BisectParent
                            old_parent_w1,
                            old_parent_id,
                            old_parent_color);
-    parent_split->next = parent->next;
-    parent->next = parent_split;
-    if (SB_BF(parent_split) > 1)  // balance the right bisection if necessary
-    {
-        span_t* old_parent = parent_split;
-        span_t* new_parent = parent_split->next;
-        span_t* child = new_parent->next;
 
-        if (SB_BF(new_parent) < 0) // need to do a double-rotation
-        {
-            child = new_parent;
-            new_parent = child->prev;
-            child->prev = new_parent->next;
-            new_parent->next = child;
-        }
-
-        old_parent->next = new_parent->prev;
-        new_parent->prev = old_parent;
-        parent->next = new_parent;
-        /* update the heights of the spans affected by the balancing */
-        old_parent->height = SB_HEIGHT(old_parent);
-        child->height = SB_HEIGHT(child);
-        new_parent->height = SB_HEIGHT(new_parent);
-    }
-    else
-    {
-        parent_split->height = SB_HEIGHT(parent_split);
-    }
-    parent->height = SB_HEIGHT(parent);
+    SB_PushAdHoc(parent, parent_split, stack, depth);
+    // FIXME: there might not even be a need for this call as the re-balancing
+    // of this specific right sub-tree is going to be handled as part of the
+    // original `SB_Push` call anyway
+    SB_BalanceAdHoc(sbuffer, stack, &bookmark, depth);
 }
 
-typedef struct {
-    span_t* span;
-    float   left, right;
-} pscope_t;
-
 #ifdef DEBUG
+static void SB_Dump(sbuffer_t* sbuffer);
+
 static int _SB_VerifyBalance (span_t* span)
 {
     const int balance_factor = SB_BF(span);
@@ -518,10 +664,19 @@ SB_Push
                             /* ------------[ CASE-L1: bisecting ]------------ */
                             if (x1 < parent->x1)
                             {
-                                SB_BisectParent(parent,
+                                SB_BisectParent(sbuffer, stack, parent,
                                                 x0, x1, w0, w1,
                                                 intersection, x1,
-                                                id, color);
+                                                id, color,
+                                                &depth);
+                                /* restore the `left` and `right` boundaries
+                                 * from the 'bookmark' as an intermediate
+                                 * rebalance might have changed them
+                                 */
+                                pscope_t* parent_scope = stack + depth - 1;
+                                left = parent_scope->left;
+                                right = parent_scope->right;
+
                                 pushed = 0xff;
                             }
                             /* -----[ CASE-L2: obscures from the right ]----- */
@@ -598,10 +753,19 @@ SB_Push
                             /* ------------[ CASE-R1: bisecting ]------------ */
                             if (x1 < parent->x1)
                             {
-                                SB_BisectParent(parent,
+                                SB_BisectParent(sbuffer, stack, parent,
                                                 x0, x1, w0, w1,
                                                 intersection, x1,
-                                                id, color);
+                                                id, color,
+                                                &depth);
+                                /* restore the `left` and `right` boundaries
+                                 * from the 'bookmark' as an intermediate
+                                 * rebalance might have changed them
+                                 */
+                                pscope_t* parent_scope = stack + depth - 1;
+                                left = parent_scope->left;
+                                right = parent_scope->right;
+
                                 pushed = 0xff;
                             }
                             /* -----[ CASE-R2: obscures from the right ]----- */
@@ -618,10 +782,19 @@ SB_Push
                             /* ------------[ CASE-R3: bisecting ]------------ */
                             if (x > parent->x0)
                             {
-                                SB_BisectParent(parent,
+                                SB_BisectParent(sbuffer, stack, parent,
                                                 x0, x1, w0, w1,
                                                 x, intersection,
-                                                id, color);
+                                                id, color,
+                                                &depth);
+                                /* restore the `left` and `right` boundaries
+                                 * from the 'bookmark' as an intermediate
+                                 * rebalance might have changed them
+                                 */
+                                pscope_t* parent_scope = stack + depth - 1;
+                                left = parent_scope->left;
+                                right = parent_scope->right;
+
                                 pushed = 0xff;
                             }
                             /* ------[ CASE-R4: obscures from the left ]----- */
@@ -660,10 +833,19 @@ SB_Push
                                 /* ----------[ CASE-R5: bisecting ]---------- */
                                 if (x1 < parent->x1)
                                 {
-                                    SB_BisectParent(parent,
+                                    SB_BisectParent(sbuffer, stack, parent,
                                                     x0, x1, w0, w1,
                                                     x, x1,
-                                                    id, color);
+                                                    id, color,
+                                                    &depth);
+                                    /* restore the `left` and `right` boundaries
+                                     * from the 'bookmark' as an intermediate
+                                     * rebalance might have changed them
+                                     */
+                                    pscope_t* parent_scope = stack + depth - 1;
+                                    left = parent_scope->left;
+                                    right = parent_scope->right;
+
                                     pushed = 0xff;
                                 }
                                 /* ---[ CASE-R6: obscures from the right ]--- */
@@ -777,7 +959,7 @@ SB_Push
                 if (balance_factor < -1 || balance_factor > 1)
                     imbalance_bookmark = stack_depth;
                 /* ...otherwise, update the height of this span */
-                else if (pushed)
+                else
                     parent_span->height = SB_HEIGHT(parent_span);
             }
 
@@ -935,6 +1117,7 @@ SB_Push
         {
             printf("[SB_VerifyBalance] %d\n", verify_balance);
             printf("[SB_VerifyHeights] %d\n", verify_heights);
+            SB_Dump(sbuffer);
         }
         SB_ASSERT(verify_heights, "[SB_Push] Improper buffer height!\n");
         SB_ASSERT(verify_balance, "[SB_Push] Buffer is improperly balanced!\n");
@@ -955,7 +1138,8 @@ static void _SB_Dump (span_t* span, size_t depth)
 {
     size_t indent = depth << 2;
     for (size_t i = 0; i < indent; ++i) printf(" ");
-    printf("[%c] [%.3f, %.3f)\n", span->id, span->x0, span->x1);
+    printf("[%c] [BF=%d] [H=%d] [%.3f, %.3f)\n",
+           span->id, SB_BF(span) , span->height, span->x0, span->x1);
     if (span->prev) _SB_Dump(span->prev, depth + 1);
     if (span->next) _SB_Dump(span->next, depth + 1);
 }
@@ -965,7 +1149,8 @@ static void _SB_Dump (span_t* span, size_t depth)
 // Dump the spans in the buffer to `stdout` in a tree-like structure to help in
 // debugging.
 //
-// Each line in the dump follows the format `[id] [x0, x1)`.
+// Each line in the dump follows the format:
+//     [<id>] [BF=<balance factor>] [H=<height>] [<x0>, <x1>).
 //
 void SB_Dump (sbuffer_t* sbuffer)
 {

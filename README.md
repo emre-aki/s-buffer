@@ -125,15 +125,19 @@ SB_Push(sbuffer, 2.6, 7.4, 1.0f/10, 1.0f/10, A + 2); // SB_Print: __ACABCB__
 
 ```c
 // The spans in the buffer can be dumped to `stdout' in a tree-like structure to
-// help in debugging. Each line follows the format `[id] [x0, x1)'.
+// help in debugging.
+//
+// Each line in the dump follows the format:
+//     [<id>] [BF=<balance factor>] [H=<height>] [<x0>, <x1>).
 SB_Dump(sbuffer);
+
 // Prints:
-// [A] [3.800, 5.000)
-//     [C] [2.600, 3.800)
-//         [A] [2.000, 2.600)
-//     [C] [6.200, 7.400)
-//         [B] [5.000, 6.200)
-//         [B] [7.400, 8.000)
+// [A] [BF=0] [H=2] [3.800, 5.000)
+//     [C] [BF=-1] [H=1] [2.600, 3.800)
+//         [A] [BF=0] [H=0] [2.000, 2.600)
+//     [C] [BF=0] [H=1] [6.200, 7.400)
+//         [B] [BF=0] [H=0] [5.000, 6.200)
+//         [B] [BF=0] [H=0] [7.400, 8.000)
 ```
 
 ### Deinitialization
