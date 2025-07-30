@@ -47,7 +47,7 @@
 #define SB_DEGENERATE 0x2
 #define SB_NOT_INTERSECTING 0x3
 
-#define SB_EPS 1e-4
+#define SB_EPS 1e-3
 
 #define SB_ASSERT(a, ...) if (!(a)) { fprintf(stderr, __VA_ARGS__); exit(1); }
 
