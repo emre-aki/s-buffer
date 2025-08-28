@@ -1,12 +1,6 @@
 <p align="center">
-    <img
-        width="456"
-        src="https://github.com/emre-aki/s-buffer/raw/demo/images/sb02.png">
-    </img>
-    <img
-        width="456"
-        src="https://github.com/emre-aki/s-buffer/raw/demo/images/sb03.png">
-    </img>
+    <img width="456" src="../.images/sb02.png"></img>
+    <img width="456" src="../.images/sb03.png"></img>
     <p align="center" style="font-size: 14px;">
         <em style="font-size: 14px;">
             Hold the <kbd>D</kbd> key on your keyboard to enable projection

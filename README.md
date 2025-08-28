@@ -2,7 +2,7 @@
 
 <br>
 <p align="center">
-    <img width="684" src="./images/sb00.png"></img>
+    <img width="684" src="./.images/sb00.png"></img>
     <p align="center">
         <em style="font-size: 14px;">S-Buffer in action</em>
     </p>
