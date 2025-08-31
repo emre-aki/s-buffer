@@ -37,10 +37,17 @@
 #define s_buffer_h_SB_Print SB_Print
 #define s_buffer_h_SB_Destroy SB_Destroy
 
+#ifdef DEBUG
+#define SB_REPR_LEFT "|"
+#define SB_REPR_RIGHT "\\"
+#define SB_REPR_ARM0 "|"
+#define SB_REPR_ARM1 "_"
+#else
 #define SB_REPR_LEFT "├"
 #define SB_REPR_RIGHT "└"
 #define SB_REPR_ARM0 "│"
 #define SB_REPR_ARM1 "─"
+#endif
 
 #define SB_INTERSECTING 0x0
 #define SB_PARALLEL 0x1
