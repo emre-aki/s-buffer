@@ -104,6 +104,7 @@ SB_Push
 void SB_Dump (sbuffer_t* sbuffer);
 void SB_Print (sbuffer_t* sbuffer);
 void SB_Destroy (sbuffer_t* sbuffer);
+////////////////////////////////// HEADER END //////////////////////////////////
 
 #ifndef S_BUFFER_DEFS_ONLY
 
