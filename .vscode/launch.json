@@ -1,0 +1,31 @@
+{
+    "version": "2.0.0",
+    "configurations": [
+        {
+            "name": "[gcc] Run demo (DEBUG)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/demo/sbuffer-demo",
+            "preLaunchTask": "[gcc] Build demo (DEBUG)",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb"
+        },
+        {
+            "name": "[gcc] Run demo (RELEASE)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/demo/sbuffer-demo",
+            "preLaunchTask": "[gcc] Build demo (RELEASE)",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb"
+        }
+    ]
+}

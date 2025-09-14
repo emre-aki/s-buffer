@@ -1,0 +1,23 @@
+{
+    "C_Cpp.default.includePath": [
+        "${workspaceFolder}",
+        "${workspaceFolder}/demo/vendor/SDL2/dist/include"
+    ],
+    "files.associations": {
+        "complex": "c",
+        "random": "cpp",
+        "sdl.h": "c",
+        "queue": "c",
+        "stack": "c",
+        "ios": "c",
+        "format": "c",
+        "time.h": "c",
+        "string.h": "c",
+        "stdio.h": "c",
+        "s_buffer.h": "c",
+        "stdlib.h": "c",
+        "cstdlib": "c"
+    },
+    "cmake.ignoreCMakeListsMissing": true,
+    "C_Cpp.dimInactiveRegions": false // piece-of-shit dumbass IntelliSense
+}
