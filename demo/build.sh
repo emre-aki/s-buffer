@@ -76,12 +76,14 @@ fi
 cd $DEMO_ROOT
 
 if [[ -z $DDEBUG ]]; then
-    gcc ./demo.c -o ./sbuffer-demo -I../ -I./vendor/SDL2/dist/include \
-                                   -L../ -lsbuffer                    \
-                                   -L./vendor/SDL2/dist/lib -lSDL2
+    gcc ./*.c -o ./sbuffer-demo -I../ -L../ -lsbuffer        \
+                                -I./vendor/SDL2/dist/include \
+                                -L./vendor/SDL2/dist/lib     \
+                                -lSDL2
 else
-    gcc ./demo.c -o ./sbuffer-demo -I../ -I./vendor/SDL2/dist/include \
-                                   -L../ -lsbuffer                    \
-                                   -L./vendor/SDL2/dist/lib -lSDL2    \
-                                   $DDEBUG -g
+    gcc ./*.c -o ./sbuffer-demo -I../ -L../ -lsbuffer        \
+                                -I./vendor/SDL2/dist/include \
+                                -L./vendor/SDL2/dist/lib     \
+                                -lSDL2                       \
+                                $DDEBUG -g
 fi
