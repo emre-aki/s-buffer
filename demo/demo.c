@@ -57,6 +57,27 @@ const size_t FRAMEBUFFER_SIZE = sizeof(framebuffer);
 const size_t SBUFFER_SIZE = sizeof(sbuffer_t);
 const size_t SPAN_SIZE = sizeof(span_t);
 
+size_t AToLL (const char* str) // bastardized version of `stdlib`s `atoll`,
+{                              // supports positive integers
+    const size_t ZERO = 48;
+    const char* curr = str;
+    size_t len = 0, out = 0, k = 1;
+
+    while (*curr) curr = str + ++len;
+
+    --curr;
+
+    for (size_t i = 0; i < len; ++i)
+    {
+        size_t digit = *curr - ZERO;
+        out += digit * k;
+        --curr;
+        k *= 10;
+    }
+
+    return out;
+}
+
 int FastAbs (int x)
 {
     const int sign_mask = x >> 31;
@@ -565,7 +586,7 @@ int Setup (SDL_Window** window, SDL_Renderer** ctx, SDL_Texture** frame)
 
     SDL_GetVersion(&sdl_version);
     SDL_GetRendererInfo(*ctx, &info);
-    printf("[SDL_Init] Done (v%d.%d.%d, renderer: %s) \n",
+    printf("[SDL_Init] Done (v%d.%d.%d, renderer: %s)\n",
            sdl_version.major, sdl_version.minor, sdl_version.patch,
            info.name);
 
@@ -696,9 +717,14 @@ Update
 }
 
 /* WARNING: For debugging use only! */
-void Prepopulate (sbuffer_t* sbuffer, seg2_t* segs, size_t* seg_head)
+void
+Prepopulate
+( sbuffer_t* sbuffer,
+  size_t     test_case_id,
+  seg2_t*    segs,
+  size_t*    seg_head )
 {
-    const test_case_t* tc = TEST_CASES + 12; // TODO: read this from `argv`
+    const test_case_t* tc = TEST_CASES + test_case_id;
 
     for (int i = 0; i < tc->segs_count; ++i)
     {
@@ -754,12 +780,25 @@ int main (int argc, char** argv)
     if (argc > 1)
     {
         char* arg = *(argv + 1);
+        size_t tcid = 0;
 
         if (*arg == '-' &&
             *(arg + 1) == 'p' &&
             *(arg + 2) == 'p' &&
             *(arg + 3) == '\0')
-            Prepopulate(sbuffer, segs, &seg_head);
+        {
+            if (argc > 2) tcid = AToLL(*(argv + 2));
+
+            if (tcid >= N_CASES)
+            {
+                fprintf(stderr,
+                        "[sbuffer-demo] Invalid test case id (%lu)\n",
+                        tcid);
+                exit(1);
+            }
+
+            Prepopulate(sbuffer, tcid, segs, &seg_head);
+        }
     }
 
     int disappear_ticks = 0; // timeout before we remove the 'push took' message
