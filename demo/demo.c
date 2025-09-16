@@ -604,15 +604,14 @@ Update
   byte_t*        ks,
   seg2_t*        segs,
   size_t*        seg_head,
-  double*        push_time_millis,
-  int*           disappear_ticks )
+  size_t*        disappear_ticks )
 {
     size_t span_count;
     size_t head = *seg_head;
     vec2_t dst;
     byte_t prev_holding_mouse_button = ms->pressed == SDL_BUTTON_LEFT;
     byte_t holding_esc;
-    byte_t did_push = 0;
+    double push_time_millis = -1; // how long the latest push took
     HandleEventSync(do_run, ms, ks);
     DrawGrid();
     DrawFrustum();
@@ -636,7 +635,6 @@ Update
     /* left mouse button is released */
     else if (!holding_esc && prev_holding_mouse_button && !ms->pressed)
     {
-        did_push = 0xff;
         vec2_t src = { ms->x, ms->y };
         seg2_t seg = { src, dst, RandomColor() };
 
@@ -682,8 +680,8 @@ Update
 
         timespec_get(&end, TIME_UTC);
 
-        *push_time_millis = (end.tv_sec - start.tv_sec +
-                             (end.tv_nsec - start.tv_nsec) / 1e9f) * 1e3f;
+        push_time_millis = (end.tv_sec - start.tv_sec +
+                            (end.tv_nsec - start.tv_nsec) / 1e9f) * 1e3f;
     }
 
     /* print debug statistics */
@@ -699,17 +697,13 @@ Update
             sbuffer->root ? sbuffer->root->height : 0);
     FillText(strbuf, 16, 48, 2, 0xff0000ff);
 
-    if (did_push) *disappear_ticks = 250;
+    if (push_time_millis > 0) *disappear_ticks = 250;
 
-    if (*disappear_ticks > 0)
+    if (*disappear_ticks)
     {
-        sprintf(strbuf, "push took      : %.3f ms", *push_time_millis);
+        sprintf(strbuf, "push took      : %.3f ms", push_time_millis);
         FillText(strbuf, 16, 64, 2, 0xff0000ff);
-        *disappear_ticks = *disappear_ticks - 1;
-    }
-    else
-    {
-        *push_time_millis = 0;
+        --*disappear_ticks;
     }
 
     *seg_head = head;
@@ -801,8 +795,8 @@ int main (int argc, char** argv)
         }
     }
 
-    int disappear_ticks = 0; // timeout before we remove the 'push took' message
-    double push_time_millis = 0; // how long the latest push took
+    // remaining ticks before we remove the 'push took' message
+    size_t disappear_ticks = 0;
 
     /* main loop */
     while (do_run)
@@ -815,7 +809,6 @@ int main (int argc, char** argv)
                ks,
                segs,
                &seg_head,
-               &push_time_millis,
                &disappear_ticks);
 
     printf("--------------------------[ SB_Dump ]--------------------------\n");
