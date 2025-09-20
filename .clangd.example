@@ -1,4 +1,5 @@
 CompileFlags:
  Add:
+   - "-xc"
    - "-Iabsolute/path/to/s-buffer/sourcetree"
    - "-Iabsolute/path/to/s-buffer/sourcetree/demo/vendor/SDL2/dist/include"
