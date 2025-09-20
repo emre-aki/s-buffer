@@ -697,17 +697,17 @@ Update
             sbuffer->root ? sbuffer->root->height : 0);
     FillText(strbuf, 16, 48, 2, 0xff0000ff);
 
-    if (*push_time_millis) *disappear_ticks = 250;
+    // set a new countdown for the 'push took' message
+    if (*push_time_millis && !*disappear_ticks) *disappear_ticks = 250;
 
     if (*disappear_ticks)
     {
         sprintf(strbuf, "push took      : %.3f ms", *push_time_millis);
         FillText(strbuf, 16, 64, 2, 0xff0000ff);
         --*disappear_ticks;
-    }
-    else
-    {
-        *push_time_millis = 0; // reset when the message dies
+
+        // reset when the message dies
+        if (!*disappear_ticks) *push_time_millis = 0;
     }
 
     *seg_head = head;
