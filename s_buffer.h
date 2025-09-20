@@ -101,8 +101,8 @@ SB_Push
   byte_t id,
   int    color );
 
-void SB_Dump (sbuffer_t* sbuffer);
-void SB_Print (sbuffer_t* sbuffer);
+void SB_Dump (const sbuffer_t* sbuffer);
+void SB_Print (const sbuffer_t* sbuffer);
 void SB_Destroy (sbuffer_t* sbuffer);
 ////////////////////////////////// HEADER END //////////////////////////////////
 
@@ -1174,7 +1174,7 @@ SB_Push
 // Each line in the dump follows the format:
 //     [<id>] [BF=<balance factor>] [H=<height>] [<x0>, <x1>).
 //
-void SB_Dump (sbuffer_t* sbuffer)
+void SB_Dump (const sbuffer_t* sbuffer)
 {
     if (!sbuffer->root)
     {
@@ -1257,30 +1257,71 @@ void SB_Dump (sbuffer_t* sbuffer)
     }
 }
 
-static void _SB_Print (span_t* span, byte_t* buffer)
+static void SB_PrintSpan (byte_t* buffer, const span_t* span)
 {
     const int X0 = ceil(span->x0 - 0.5f), X1 = ceil(span->x1 - 0.5f);
     const int span_size = X1 - X0;
     int x = X0;
 
-    for (int i = 0; i < span_size; ++i) *(buffer + x++) = span->id;
-    if (span->prev) _SB_Print(span->prev, buffer);
-    if (span->next) _SB_Print(span->next, buffer);
+    for (size_t i = 0; i < span_size; ++i) *(buffer + x++) = span->id;
 }
 
 //
 // SB_Print
 // Render the contents of the buffer into `stdout`.
 //
-void SB_Print (sbuffer_t* sbuffer)
+void SB_Print (const sbuffer_t* sbuffer)
 {
-    int buffer_size = sbuffer->size;
-    byte_t buffer[buffer_size + 1];
+    const size_t max_depth = sbuffer->max_depth + 1; // call stack size
+    const size_t size = sbuffer->size + 1;           // output size
+    const span_t* curr = sbuffer->root;
+    const span_t* stack[max_depth];
+    byte_t bookmarks[max_depth];
+    byte_t out[size];
+    int sp = 0; // stack pointer
+    int cp = 0; // child pointer
 
-    *(buffer + buffer_size) = 0;
-    for (int i = 0; i < buffer_size; ++i) *(buffer + i) = '_';
-    if (sbuffer->root) _SB_Print(sbuffer->root, buffer);
-    printf("%s\n", buffer);
+    for (size_t i = 0; i < size; ++i) *(out + i) = '_';
+    *(out + size - 1) = 0;
+
+    while (curr)
+    {
+        *(stack + sp) = curr;
+        *(bookmarks + sp++) = cp;
+
+        if (!cp && curr->prev)
+        {
+            curr = curr->prev;
+        }
+        else if (cp < 2 && curr->next)
+        {
+            SB_PrintSpan(out, curr);
+
+            cp = 0; // reset child pointer as we're about to enter a new subtree
+            *(bookmarks + sp - 1) = 1; // update parent's bookmark to `next`
+            curr = curr->next;
+        }
+        /* either we've already visited both children, or we hit a leaf node.
+         * either way, walk back one step up the stack.
+         */
+        else if (--sp > 0)
+        {
+            if (!curr->next) SB_PrintSpan(out, curr);
+
+            curr = *(stack + --sp);
+            cp = *(bookmarks + sp) - 1;
+        }
+        else
+        {
+            // we need to account for cases where the S-Buffer only has a single
+            // `prev` child and a maximum depth of one
+            if (!curr->next) SB_PrintSpan(out, curr);
+
+            curr = 0; // exit condition
+        }
+    }
+
+    printf("%s\n", out);
 }
 
 //
