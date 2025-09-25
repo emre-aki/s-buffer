@@ -16,7 +16,7 @@
 #define prepop_h
 #define prepop_h_TEST_CASES TEST_CASES
 
-#define N_CASES 14
+#define N_CASES 15
 
 typedef struct {
     const seg2_t* segs;
