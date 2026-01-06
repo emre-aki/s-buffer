@@ -1147,8 +1147,8 @@ SB_Push
         const int verify_heights = SB_VerifyHeights(sbuffer);
         if (!(verify_balance && verify_heights))
         {
-            printf("[SB_VerifyBalance] %d\n", verify_balance);
-            printf("[SB_VerifyHeights] %d\n", verify_heights);
+            printf("[SB_VerifyBalance] %s\n", verify_balance ? "OK" : "NOK");
+            printf("[SB_VerifyHeights] %s\n", verify_heights ? "OK" : "NOK");
             SB_Dump(sbuffer);
         }
         SB_ASSERT(verify_heights, "[SB_Push] Improper buffer height!\n");
