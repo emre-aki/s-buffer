@@ -122,8 +122,7 @@
 #define SB_BF(n) (((n)->next ? ((n)->next->height + 1) : 0) - \
                   ((n)->prev ? ((n)->prev->height + 1) : 0))
 
-// FIXME: mitigate the `SB_MAX` usage here
-#define SB_HEIGHT(n) (SB_MAX((n)->prev ? ((n)->prev->height + 1) : 0, \
+#define SB_HEIGHT(n) (SB_MAX((n)->prev ? ((n)->prev->height + 1) : 0,  \
                              (n)->next ? ((n)->next->height + 1) : 0))
 
 #define SB_CROSS_2D(a, b, c, d) ((a) * (d) - (b) * (c))
@@ -642,6 +641,57 @@ static int SB_VerifyHeights (sbuffer_t* sbuffer)
 
     return res;
 }
+
+//
+// SB_VerifyHealth
+// Validates S-Buffer span-tree invariants.
+// Returns `0` if healthy, otherwise the first violation id encountered.
+//
+// BST ordering rules:
+//   - parent->x0 > prev->x0   (violation id: `0x2`)
+//   - parent->x0 < next->x0   (violation id: `0x4`)
+//
+// Span validity and non-overlap:
+//   - parent->x0 < parent->x1 (violation id: `0x1`)
+//   - parent->x0 >= prev->x1  (violation id: `0x3`)
+//   - parent->x1 <= next->x0  (violation id: `0x5`)
+//
+static byte_t SB_VerifyHealth (const sbuffer_t* sbuffer)
+{
+    const span_t* curr = sbuffer->root;
+    if (!curr) return 0;
+
+    const span_t* queue[(1 << (curr->height + 1)) - 1];
+    size_t head = 0;
+    *(queue + head++) = curr;
+
+    while (head--)
+    {
+        curr = *(queue + head);
+
+        if (curr->x0 >= curr->x1) return 0x1; // parent has non-positive length
+
+        if (curr->next)
+        {
+            // parent's on the right of `next`
+            if (curr->x0 >= curr->next->x0) return 0x4;
+            // parent's protruding from right
+            if (curr->x1 > curr->next->x0) return 0x5;
+            *(queue + head++) = curr->next;
+        }
+
+        if (curr->prev)
+        {
+            // parent's on the left of `prev`
+            if (curr->x0 <= curr->prev->x0) return 0x2;
+            // parent's protruding from left
+            if (curr->x0 < curr->prev->x1) return 0x3;
+            *(queue + head++) = curr->prev;
+        }
+    }
+
+    return 0;
+}
 #endif // DEBUG
 
 //
@@ -963,7 +1013,6 @@ SB_Push
                                      curr = parent->prev;
 
                                      continue;
-
                                 }
                                 /* -----[ CASE-R8: completely obscures ]----- */
                                 else
@@ -1203,12 +1252,15 @@ SB_Push
 #ifdef DEBUG
         const int verify_balance = SB_VerifyBalance(sbuffer);
         const int verify_heights = SB_VerifyHeights(sbuffer);
-        if (!(verify_balance && verify_heights))
+        const int health_violation = SB_VerifyHealth(sbuffer);
+        if (!(verify_balance && verify_heights && !health_violation))
         {
+            printf("[SB_VerifyHealth] %s\n", health_violation ? "NOK" : "OK");
             printf("[SB_VerifyBalance] %s\n", verify_balance ? "OK" : "NOK");
             printf("[SB_VerifyHeights] %s\n", verify_heights ? "OK" : "NOK");
             SB_Dump(sbuffer);
         }
+        SB_ASSERT(!health_violation, "[SB_Push] Tainted buffer!\n");
         SB_ASSERT(verify_heights, "[SB_Push] Improper buffer height!\n");
         SB_ASSERT(verify_balance, "[SB_Push] Buffer is improperly balanced!\n");
 #endif // DEBUG
