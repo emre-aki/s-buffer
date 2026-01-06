@@ -8,7 +8,6 @@ DIST_ROOT="$ROOT/dist"
 rm -rfv "$DIST_ROOT"
 mkdir "$DIST_ROOT"
 
-
 if [[ $1 == "-d" ]]; then
     gcc -shared -DDEBUG ./s_buffer.c -o "$DIST_ROOT/libsbuffer.so" -fPIC -v -g
 else

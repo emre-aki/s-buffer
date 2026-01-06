@@ -1,0 +1,24 @@
+[
+  {
+    "label": "[gcc] Build demo (DEBUG)",
+    "build": {
+      "command": "$ZED_WORKTREE_ROOT/demo/build.sh",
+      "args": ["-d"],
+      "cwd": "$ZED_WORKTREE_ROOT"
+    },
+    "program": "$ZED_WORKTREE_ROOT/demo/sbuffer-demo",
+    "args": ["-pp", "15"],
+    "request": "launch",
+    "adapter": "CodeLLDB"
+  },
+  {
+    "label": "[gcc] Build demo (RELEASE)",
+    "build": {
+      "command": "$ZED_WORKTREE_ROOT/demo/build.sh",
+      "cwd": "$ZED_WORKTREE_ROOT"
+    },
+    "program": "$ZED_WORKTREE_ROOT/demo/sbuffer-demo",
+    "request": "launch",
+    "adapter": "CodeLLDB"
+  }
+]
