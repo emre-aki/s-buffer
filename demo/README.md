@@ -59,9 +59,9 @@ visualize the contents of the buffer.
 
 Notice how only those sections of scanlines closer to the camera that are not
 obscured by others appear in the projection and are what's actually stored in
-the buffer. If a newly added span is obscured by an existing one, it'll be
-clipped accordingly before being pushed onto the buffer. Likewise, if a new span
-is obscuring an existing one, the existing will be clipped, or discarded
+the buffer. If an incoming span is obscured by an existing one, it'll be clipped
+accordingly before being pushed onto the buffer. Likewise, if a new span is
+obscuring an existing one, the existing will be clipped, or discarded
 completely. This is the exact problem (i.e., hidden surface removal, or
 sometimes more broadly referred to as the visibility problem) that the S-Buffer
 (or Z-Buffer for that matter) is used to solve.
