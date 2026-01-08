@@ -168,6 +168,14 @@ void SB_Destroy (sbuffer_t* sbuffer);
 #include <stdio.h>
 #include <math.h>
 
+#define _SB_Falmeq_Select(_arg0, _arg1, _arg2, Fn_Name, ...) Fn_Name
+#define _SB_Falmeq_Eps(a, b, eps) SB_Falmeq_Impl(a, b, eps)
+#define _SB_Falmeq_Const(a, b)    SB_Falmeq_Impl(a, b, SB_EPS)
+
+#define SB_Falmeq(...) _SB_Falmeq_Select(__VA_ARGS__,                   \
+                                         _SB_Falmeq_Eps,                \
+                                         _SB_Falmeq_Const)(__VA_ARGS__)
+
 typedef struct {
     float x, z;
 } span2_t;
@@ -179,20 +187,20 @@ typedef struct {
 //
 typedef struct {
     span_t* span;
-    float   left, right; // left and right extremities of the current 'push call'
+    float   left, right; // left and right extremities of the 'push scope'
 } pscope_t;
 
 //
 // SB_Falmeq
 // Whether two float values are almost equal
 //
-static byte_t SB_Falmeq (float x, float y)
+static byte_t SB_Falmeq_Impl (float x, float y, float eps)
 {
     float res = x - y;
     int i = *((int*) &res) & 0x7fffffff;
     res = *((float*) &i);
 
-    return res < SB_EPS;
+    return res < eps;
 }
 
 static
@@ -249,17 +257,25 @@ SB_Intersect2D
   span2_t c, span2_t d,
   span2_t* out )
 {
+    const float DEGENERACY_EPS = 1e-5;
+
     const span2_t u = { b.x - a.x, b.z - a.z };
     const span2_t v = { d.x - c.x, d.z - c.z };
     const span2_t c_a = { c.x - a.x, c.z - a.z };
     const float numer_t = SB_CROSS_SPAN2(&c_a, &v);
     const float numer_q = SB_CROSS_SPAN2(&c_a, &u);
     const float denom = SB_CROSS_SPAN2(&u, &v);
-    const float t = numer_t / denom;
-    const float q = numer_q / denom;
 
-    if (numer_t && !denom) return SB_PARALLEL;
-    if (!(numer_t || denom)) return SB_DEGENERATE;
+    const byte_t nonzero_numer = !(SB_Falmeq(numer_t, 0, DEGENERACY_EPS) ||
+                                   SB_Falmeq(numer_q, 0, DEGENERACY_EPS));
+    const byte_t nonzero_denom = !SB_Falmeq(denom, 0, DEGENERACY_EPS);
+    if (!(nonzero_numer || nonzero_denom)) return SB_DEGENERATE;
+    if (nonzero_numer && !nonzero_denom) return SB_PARALLEL;
+    if (!nonzero_numer) return SB_NOT_INTERSECTING;
+
+    const float denom_ = 1 / denom;
+    const float t = numer_t * denom_, q = numer_q * denom_;
+
     // TODO: maybe use `Falmeq` here as well?
     if (t <= SB_EPS || t >= 1 - SB_EPS || q <= SB_EPS || q >= 1 - SB_EPS)
         return SB_NOT_INTERSECTING;
