@@ -5,6 +5,8 @@
  *  Created by Emre Akı on 2024-09-17.
  *
  *  SYNOPSIS:
+ *      s_buffer -- Header-only library for efficient S-Buffering
+ *
  *      A rather unique implementation of the ubiquitous S-Buffer -- once a
  *      popular alternative to Z-Buffering for solving the hidden surface
  *      removal problem in software rendering.
@@ -12,7 +14,7 @@
  *      The implementation uses a binary tree instead of a linked list to cut
  *      down on the search time. It also supports self-balancing following each
  *      insertion to keep the depth of the tree at a minimum. A single insertion
- *      takes order O(log n), where `n` is the current number of spans pushed
+ *      takes time O(log n), where `n` is the current number of spans pushed
  *      onto the buffer.
  *
  *      The spans need not be inserted in front-to-back order. The buffer can
@@ -20,6 +22,61 @@
  *
  *      Original FAQ by Paul Nettle:
  *      https://www.gamedev.net/articles/programming/graphics/s-buffer-faq-r668/
+ *
+ *  DOCUMENTATION:
+ *
+ *  COORDINATE SPACE:
+ *      Span endpoints (x0, w0) and (x1, w1) are specified in perspective-
+ *      correct screen space. The values w0 and w1 are the multiplicative
+ *      inverses of the distances from the eye in view space.
+ *
+ *      Equivalently:
+ *
+ *          w0 = 1 / z0_view = 1 / w0_clip
+ *          w1 = 1 / z1_view = 1 / w1_clip
+ *
+ *  USAGE:
+ *      Initialization
+ *
+ *          sbuffer_t* sbuffer = SB_Init(width, z_near, max_depth);
+ *          sbuffer_t* sbuffer = SB_Init(640, 2, 1024);
+ *
+ *      Insertion
+ *
+ *          unsigned char A = 65;
+ *
+ *          SB_Push(sbuffer, 2,   5,   1.0f / 12, 1.0f / 9,  A);     // _AAA____
+ *          SB_Push(sbuffer, 5,   8,   1.0f / 9,  1.0f / 12, A + 1); // _AAABBB_
+ *          SB_Push(sbuffer, 2.6, 7.4, 1.0f / 10, 1.0f / 10, A + 2); // _ACABCB_
+ *
+ *      Rasterization
+ *
+ *          SB_Print(sbuffer); // `_' denotes empty pixels
+ *
+ *  DEBUGGING:
+ *      The contents of the buffer can be dumped in a tree-like structure for
+ *      inspection.
+ *
+ *          SB_Dump(sbuffer);
+ *
+ *      Each line in the dump follows the format:
+ *
+ *          [<id>] [BF=<balance factor>] [H=<height>] [<x0>, <x1>)
+ *
+ *      Example output:
+ *
+ *          [A] [BF=0] [H=2] [3.800, 5.000)
+ *           ├─[C] [BF=-1] [H=1] [2.600, 3.800)
+ *           │  └─[A] [BF=0] [H=0] [2.000, 2.600)
+ *           └─[C] [BF=0] [H=1] [6.200, 7.400)
+ *              ├─[B] [BF=0] [H=0] [5.000, 6.200)
+ *              └─[B] [BF=0] [H=0] [7.400, 8.000)
+ *
+ *  LIFETIME:
+ *      SB_Destroy(sbuffer); // Releases all memory owned by the buffer
+ *
+ *  AUTHOR:
+ *      Emre Akı <aki.emre@icloud.com>
  */
 
 // FIXME: find a sensible way of using `e_malloc` in this library!
@@ -104,7 +161,8 @@ SB_Push
 void SB_Dump (const sbuffer_t* sbuffer);
 void SB_Print (const sbuffer_t* sbuffer);
 void SB_Destroy (sbuffer_t* sbuffer);
-////////////////////////////////// HEADER END //////////////////////////////////
+//
+// HEADER END //////////////////////////////////////////////////////////////////
 
 #ifndef S_BUFFER_DEFS_ONLY
 

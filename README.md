@@ -15,7 +15,7 @@ software rendering.
 
 The implementation uses a binary tree instead of a linked list to cut down on
 the search time. It also supports self-balancing following each insertion to
-keep the depth of the tree at a minimum. A single insertion takes order
+keep the depth of the tree at a minimum. A single insertion takes time
 $O(log n)$, where $n$ is the current number of spans pushed onto the buffer.
 
 The spans need not be inserted in front-to-back order. The buffer can handle
