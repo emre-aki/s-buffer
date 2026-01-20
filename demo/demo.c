@@ -50,7 +50,7 @@ const size_t GRID = 1 << GRID_SIZE;
 byte_t ID = 65;
 
 // buffer the frame before it's actually drawn to the screen
-color_t framebuffer[BUFFER_W * BUFFER_H] = { 0 };
+color_t framebuffer[BUFFER_W * BUFFER_H];
 const size_t N_PIXELS = BUFFER_W * BUFFER_H;
 
 const size_t FRAMEBUFFER_SIZE = sizeof(framebuffer);
@@ -671,13 +671,11 @@ Update
         struct timespec start, end;
 
         timespec_get(&start, TIME_UTC);
-
         SB_Push(sbuffer,
                 screen_x0, screen_x1,
                 screen_w0, screen_w1,
                 ID++,
                 seg.color);
-
         timespec_get(&end, TIME_UTC);
 
         *push_time_millis = (end.tv_sec - start.tv_sec +
