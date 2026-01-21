@@ -1419,7 +1419,7 @@ void SB_Print (const sbuffer_t* sbuffer)
             if (!curr->next) SB_PrintSpan(out, curr);
 
             curr = *(stack + --sp);
-            cp = *(bookmarks + sp) - 1;
+            cp = *(bookmarks + sp) + 1;
         }
         else
         {
