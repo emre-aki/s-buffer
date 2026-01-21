@@ -31,11 +31,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-cd $(dirname $0)
+cd "$(dirname "$0")"
 
-DEMO_ROOT=$PWD
-VENDOR_ROOT=$DEMO_ROOT/vendor
-SDL_ROOT=$VENDOR_ROOT/SDL2
+DEMO_ROOT="$PWD"
+VENDOR_ROOT="$DEMO_ROOT/vendor"
+SDL_ROOT="$VENDOR_ROOT/SDL2"
 
 # ==============================================================================
 # build SDL
@@ -44,7 +44,7 @@ if [[ !(-d $SDL_ROOT/dist && -z $CLEAN) ]]; then
     git submodule update --init --recursive # update the SDL submodule
 
     # clear the build directory
-    cd $SDL_ROOT
+    cd "$SDL_ROOT"
     rm -rf ./build
     mkdir ./build
 
@@ -54,7 +54,7 @@ if [[ !(-d $SDL_ROOT/dist && -z $CLEAN) ]]; then
 
     # configure, build, and install SDL
     cd ./build
-    ../configure --prefix=$SDL_ROOT/dist --enable-static=yes
+    ../configure --prefix="$SDL_ROOT/dist" --enable-static=yes
     make
     make install
 fi
@@ -62,7 +62,7 @@ fi
 # ==============================================================================
 # build s-buffer
 # ==============================================================================
-cd $DEMO_ROOT/..
+cd "$DEMO_ROOT/.."
 
 if [[ -z $DDEBUG ]]; then
     ./build.sh
@@ -73,7 +73,7 @@ fi
 # ==============================================================================
 # build demo
 # ==============================================================================
-cd $DEMO_ROOT
+cd "$DEMO_ROOT"
 
 if [[ -z $DDEBUG ]]; then
     gcc ./*.c -o ./sbuffer-demo -I../ -L../dist -lsbuffer    \
