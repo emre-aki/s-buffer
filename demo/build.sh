@@ -33,7 +33,7 @@ done
 
 cd "$(dirname "$0")"
 
-DEMO_ROOT="$PWD"
+DEMO_ROOT="$(pwd -P)"
 VENDOR_ROOT="$DEMO_ROOT/vendor"
 SDL_ROOT="$VENDOR_ROOT/SDL2"
 

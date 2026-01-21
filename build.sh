@@ -2,7 +2,7 @@
 
 cd "$(dirname "$0")"
 
-ROOT="$PWD"
+ROOT="$(pwd -P)"
 DIST_ROOT="$ROOT/dist"
 
 rm -rfv "$DIST_ROOT"
