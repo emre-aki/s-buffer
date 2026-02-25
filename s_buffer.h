@@ -778,12 +778,8 @@ SB_Push
         /* try to find an available spot to insert */
         while (curr)
         {
-            if (depth == sbuffer->max_depth)
-            {
-                printf("[SB_Push] Maximum buffer depth reached!\n");
-
-                return 1;
-            }
+            SB_ASSERT(depth < sbuffer->max_depth,
+                      "[SB_Push] Maximum buffer depth reached!\n");
 
             parent = curr;
             pscope_t scope = { parent, left, right };
@@ -794,9 +790,9 @@ SB_Push
 
             float intersection, leftness;
             byte_t not_intersecting = SB_DEGENERATE;
-            if (id == parent->id) // 😩 good lord, enough already with these
-                leftness = 0;     // epsilon problems -- gotta skip on those
-            else                  // self-intersections
+            if (id == parent->id) // 👈 subdivisions of the original input span,
+                leftness = 0;     // all collinear and overlapping. FP rounding
+            else                  // errors disagree -- obviously.
                 not_intersecting = SB_SpanIntersect(
                     x, w,
                     x1, w1,
@@ -1315,12 +1311,12 @@ void SB_Dump (const sbuffer_t* sbuffer)
         return;
     }
 
-    const size_t size = sbuffer->max_depth + 1;
+    const size_t max_depth = sbuffer->max_depth + 1;
     const span_t* curr = sbuffer->root;
-    const span_t* stack[size];
-    byte_t bookmarks[size];
-    byte_t visited[size];
-    byte_t has_right_sibling[size];
+    const span_t* stack[max_depth];
+    byte_t bookmarks[max_depth];
+    byte_t visited[max_depth];
+    byte_t has_right_sibling[max_depth];
     int sp = 0; // stack pointer
     int cp = 0; // child pointer
 
@@ -1329,6 +1325,8 @@ void SB_Dump (const sbuffer_t* sbuffer)
 
     while (curr)
     {
+        SB_ASSERT(sp < max_depth, "[SB_Dump] Maximum buffer depth reached!\n");
+
         const byte_t previously_visited = *(visited + sp);
         *(stack + sp) = curr;
         *(bookmarks + sp) = cp;
@@ -1418,6 +1416,8 @@ void SB_Print (const sbuffer_t* sbuffer)
 
     while (curr)
     {
+        SB_ASSERT(sp < max_depth, "[SB_Print] Maximum buffer depth reached!\n");
+
         *(stack + sp) = curr;
         *(bookmarks + sp++) = cp;
 
@@ -1462,14 +1462,18 @@ void SB_Print (const sbuffer_t* sbuffer)
 //
 void SB_Destroy (sbuffer_t* sbuffer)
 {
+    const size_t max_depth = sbuffer->max_depth + 1;
     span_t *curr = sbuffer->root, *parent;
-    span_t* stack[sbuffer->max_depth + 1];
+    span_t* stack[max_depth];
     size_t i = 0;
 
     while (curr)
     {
         while (curr)
         {
+            SB_ASSERT(i < max_depth,
+                      "[SB_Destroy] Maximum buffer depth reached!\n");
+
             parent = curr;
             *(stack + i++) = parent;
             curr = parent->prev;
