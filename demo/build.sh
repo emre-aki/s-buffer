@@ -1,28 +1,32 @@
 #!/bin/bash
 
 CLEAN=""
-DDEBUG=""
+SB_DEBUG=""
+SB_VERBOSE=""
 
 while [[ $# -gt 0 ]]; do
     key="$1"
 
     case $key in
-    -d|--debug)
-        DG="-g"
-        DV="-v"
-        DDEBUG="-DDEBUG"
-        shift
-        ;;
     -c|--clean)
         CLEAN="true"
         shift
         ;;
+    -d|--debug)
+        SB_DEBUG="-d"
+        shift
+        ;;
     -h|--help)
         echo "Options:
--d,    --debug  Build in debug mode
--c,    --clean  Rebuild all dependencies
--h,    --help   Display this help message and exit"
+-c,    --clean    Rebuild all dependencies
+-d,    --debug    Build in debug mode
+-h,    --help     Display this help message and exit
+-v,    --verbose  Enable verbose logging"
         exit 0
+        ;;
+    -v|--verbose)
+        SB_VERBOSE="-v"
+        shift
         ;;
     -*)
         echo "fatal: Unknown argument $1"
@@ -64,18 +68,14 @@ fi
 # ==============================================================================
 cd "$DEMO_ROOT/.."
 
-if [[ -z $DDEBUG ]]; then
-    ./build.sh
-else
-    ./build.sh -d
-fi
+./build.sh $SB_DEBUG $SB_VERBOSE
 
 # ==============================================================================
 # build demo
 # ==============================================================================
 cd "$DEMO_ROOT"
 
-if [[ -z $DDEBUG ]]; then
+if [[ -z $SB_DEBUG ]]; then
     gcc ./*.c -o ./sbuffer-demo -I../ -L../dist -lsbuffer    \
                                 -I./vendor/SDL2/dist/include \
                                 -L./vendor/SDL2/dist/lib     \
@@ -85,5 +85,5 @@ else
                                 -I./vendor/SDL2/dist/include \
                                 -L./vendor/SDL2/dist/lib     \
                                 -lSDL2                       \
-                                $DDEBUG -g
+                                -DSB_DEBUG -g
 fi

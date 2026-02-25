@@ -663,10 +663,10 @@ Update
         screen_w1 = src_min * ZToScreenSpace(seg.dst.y) +
                     !src_min * ZToScreenSpace(seg.src.y);
 
-#ifdef DEBUG
+#ifdef SB_DEBUG
         printf("{ { %d, %d }, { %d, %d }, %d }\n",
                 seg.src.x, seg.src.y, seg.dst.x, seg.dst.y, seg.color);
-#endif // DEBUG
+#endif // SB_DEBUG
 
         struct timespec start, end;
 
@@ -822,6 +822,10 @@ int main (int argc, char** argv)
     SB_Destroy(sbuffer);
     Destroy(window, ctx, frame);
     printf("Goodbye!\n");
+
+#ifdef SB_DEBUG
+    printf("Releasing: %lu spans\n", seg_head);
+#endif // SB_DEBUG
 
     return 0;
 }

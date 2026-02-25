@@ -94,7 +94,7 @@
 #define s_buffer_h_SB_Print SB_Print
 #define s_buffer_h_SB_Destroy SB_Destroy
 
-#ifdef DEBUG
+#ifdef SB_DEBUG
 #define SB_REPR_LEFT "|"
 #define SB_REPR_RIGHT "\\"
 #define SB_REPR_ARM0 "|"
@@ -157,8 +157,8 @@ SB_Push
   byte_t id,
   int    color );
 
-void SB_Dump (const sbuffer_t* sbuffer);
-void SB_Print (const sbuffer_t* sbuffer);
+void SB_Dump    (const sbuffer_t* sbuffer);
+void SB_Print   (const sbuffer_t* sbuffer);
 void SB_Destroy (sbuffer_t* sbuffer);
 //
 // HEADER END //////////////////////////////////////////////////////////////////
@@ -189,6 +189,119 @@ typedef struct {
     span_t* span;
     float   left, right; // left and right extremities of the 'push scope'
 } pscope_t;
+
+// DEBUGGING UTILITIES /////////////////////////////////////////////////////////
+//
+#ifdef SB_DEBUG
+static byte_t _SB_VerifyBalance (const span_t* span)
+{
+    const int balance_factor = SB_BF(span);
+    byte_t left_res = 1, right_res = 1;
+
+    if (balance_factor < -1 || balance_factor > 1) return 0;
+    if (span->prev) left_res = _SB_VerifyBalance(span->prev);
+    if (span->next) right_res = _SB_VerifyBalance(span->next);
+
+    return left_res && right_res;
+}
+
+//
+// SB_VerifyBalance
+// Report whether or not an S-Buffer instance is properly balanced.
+//
+static byte_t SB_VerifyBalance (const sbuffer_t* sbuffer)
+{
+    if (!sbuffer->root) return 1;
+
+    return _SB_VerifyBalance(sbuffer->root);
+}
+
+static int _SB_VerifyHeights (const span_t* span, byte_t* out)
+{
+    if (!(span->prev || span->next))
+    {
+        if (span->height != 0) *out &= 0;
+
+        return 0;
+    }
+
+    int left_height = 0, right_height = 0;
+    if (span->prev) left_height = _SB_VerifyHeights(span->prev, out);
+    if (span->next) right_height = _SB_VerifyHeights(span->next, out);
+    const int self_height = SB_MAX(left_height, right_height) + 1;
+
+    if (self_height != span->height) *out &= 0;
+
+    return self_height;
+}
+
+//
+// SB_VerifyHeights
+// Report whether or not each span node in an S-Buffer instance has its height
+// assigned correctly.
+//
+static int SB_VerifyHeights (const sbuffer_t* sbuffer)
+{
+    if (!sbuffer->root) return 1;
+
+    byte_t out = 1;
+
+    _SB_VerifyHeights(sbuffer->root, &out);
+
+    return out;
+}
+
+//
+// SB_VerifyHealth
+// Validates S-Buffer span-tree invariants.
+// Returns `0` if healthy, otherwise the first violation id encountered.
+//
+// BST ordering rules:
+//   - parent->x0 > prev->x0   (violation id: `0x2`)
+//   - parent->x0 < next->x0   (violation id: `0x4`)
+//
+// Span validity and non-overlap:
+//   - parent->x0 < parent->x1 (violation id: `0x1`)
+//   - parent->x0 ≥ prev->x1   (violation id: `0x3`)
+//   - parent->x1 ≤ next->x0   (violation id: `0x5`)
+//
+static byte_t SB_VerifyHealth (const sbuffer_t* sbuffer)
+{
+    const span_t* curr = sbuffer->root;
+    if (!curr) return 0;
+
+    const span_t* queue[(1 << (curr->height + 1)) - 1];
+    size_t head = 0;
+    *(queue + head++) = curr;
+
+    while (head--)
+    {
+        curr = *(queue + head);
+
+        if (curr->x0 >= curr->x1) return 0x1; // parent has non-positive length
+
+        if (curr->next)
+        {
+            // parent's on the right of `next`
+            if (curr->x0 >= curr->next->x0) return 0x4;
+            // parent's protruding from right
+            if (curr->x1 > curr->next->x0) return 0x5;
+            *(queue + head++) = curr->next;
+        }
+
+        if (curr->prev)
+        {
+            // parent's on the left of `prev`
+            if (curr->x0 <= curr->prev->x0) return 0x2;
+            // parent's protruding from left
+            if (curr->x0 < curr->prev->x1) return 0x3;
+            *(queue + head++) = curr->prev;
+        }
+    }
+
+    return 0;
+}
+#endif // SB_DEBUG
 
 //
 // SB_Falmeq
@@ -598,117 +711,6 @@ SB_BisectParent
     // original `SB_Push` call anyway
     SB_BalanceAdHoc(sbuffer, stack, &bookmark, depth);
 }
-
-#ifdef DEBUG
-static byte_t _SB_VerifyBalance (span_t* span)
-{
-    const int balance_factor = SB_BF(span);
-    byte_t left_res = 1, right_res = 1;
-
-    if (balance_factor < -1 || balance_factor > 1) return 0;
-    if (span->prev) left_res = _SB_VerifyBalance(span->prev);
-    if (span->next) right_res = _SB_VerifyBalance(span->next);
-
-    return left_res && right_res;
-}
-
-//
-// SB_VerifyBalance
-// Report whether or not an S-Buffer instance is properly balanced
-//
-static byte_t SB_VerifyBalance (sbuffer_t* sbuffer)
-{
-    if (!sbuffer->root) return 1;
-
-    return _SB_VerifyBalance(sbuffer->root);
-}
-
-static int _SB_VerifyHeights (span_t* span, byte_t* res)
-{
-    if (!(span->prev || span->next))
-    {
-        if (span->height != 0) *res &= 0;
-
-        return 0;
-    }
-
-    int left_height = 0, right_height = 0;
-    if (span->prev) left_height = _SB_VerifyHeights(span->prev, res);
-    if (span->next) right_height = _SB_VerifyHeights(span->next, res);
-    const int self_height = SB_MAX(left_height, right_height) + 1;
-
-    if (self_height != span->height) *res &= 0;
-
-    return self_height;
-}
-
-//
-// SB_VerifyHeights
-// Report whether or not each span node in an S-Buffer instance has its height
-// assigned correctly
-//
-static int SB_VerifyHeights (sbuffer_t* sbuffer)
-{
-    if (!sbuffer->root) return 1;
-
-    byte_t res = 1;
-
-    _SB_VerifyHeights(sbuffer->root, &res);
-
-    return res;
-}
-
-//
-// SB_VerifyHealth
-// Validates S-Buffer span-tree invariants.
-// Returns `0` if healthy, otherwise the first violation id encountered.
-//
-// BST ordering rules:
-//   - parent->x0 > prev->x0   (violation id: `0x2`)
-//   - parent->x0 < next->x0   (violation id: `0x4`)
-//
-// Span validity and non-overlap:
-//   - parent->x0 < parent->x1 (violation id: `0x1`)
-//   - parent->x0 >= prev->x1  (violation id: `0x3`)
-//   - parent->x1 <= next->x0  (violation id: `0x5`)
-//
-static byte_t SB_VerifyHealth (const sbuffer_t* sbuffer)
-{
-    const span_t* curr = sbuffer->root;
-    if (!curr) return 0;
-
-    const span_t* queue[(1 << (curr->height + 1)) - 1];
-    size_t head = 0;
-    *(queue + head++) = curr;
-
-    while (head--)
-    {
-        curr = *(queue + head);
-
-        if (curr->x0 >= curr->x1) return 0x1; // parent has non-positive length
-
-        if (curr->next)
-        {
-            // parent's on the right of `next`
-            if (curr->x0 >= curr->next->x0) return 0x4;
-            // parent's protruding from right
-            if (curr->x1 > curr->next->x0) return 0x5;
-            *(queue + head++) = curr->next;
-        }
-
-        if (curr->prev)
-        {
-            // parent's on the left of `prev`
-            if (curr->x0 <= curr->prev->x0) return 0x2;
-            // parent's protruding from left
-            if (curr->x0 < curr->prev->x1) return 0x3;
-            *(queue + head++) = curr->prev;
-        }
-    }
-
-    return 0;
-}
-#endif // DEBUG
 
 //
 // SB_Push
@@ -1265,7 +1267,7 @@ SB_Push
             }
         }
 
-#ifdef DEBUG
+#ifdef SB_DEBUG
         const int verify_balance = SB_VerifyBalance(sbuffer);
         const int verify_heights = SB_VerifyHeights(sbuffer);
         const int health_violation = SB_VerifyHealth(sbuffer);
@@ -1279,12 +1281,14 @@ SB_Push
         SB_ASSERT(!health_violation, "[SB_Push] Tainted buffer!\n");
         SB_ASSERT(verify_heights, "[SB_Push] Improper buffer height!\n");
         SB_ASSERT(verify_balance, "[SB_Push] Buffer is improperly balanced!\n");
-#endif // DEBUG
+#endif // SB_DEBUG
     }
 
     if (!pushed)
     {
+#ifdef SB_VERBOSE
         printf("[SB_Push] Cannot add more segments, spot fully occluded!\n");
+#endif // SB_VERBOSE
 
         return 1;
     }
@@ -1304,7 +1308,9 @@ void SB_Dump (const sbuffer_t* sbuffer)
 {
     if (!sbuffer->root)
     {
+#ifdef SB_VERBOSE
         printf("[SB_Dump] Empty S-Buffer!\n");
+#endif // SB_VERBOSE
 
         return;
     }
