@@ -58,3 +58,4 @@ dkms.conf
 # Output / Build artifacts
 sbuffer*
 dist/
+tests/test

@@ -16,20 +16,10 @@
 
 #define demodef_h
 #define demodef_h_GLYPH_TABLE GLYPH_TABLE;
+#define demodef_h_mouse_state_t mouse_state_t
 
 #define FONT_HEIGHT 6
 #define FONT_WIDTH 5
-
-typedef unsigned int color_t;
-
-typedef struct {
-    int x, y;
-} vec2_t;
-
-typedef struct {
-    vec2_t src, dst;
-    color_t color;
-} seg2_t;
 
 typedef struct {
     int x, y;

@@ -1,0 +1,25 @@
+#!/bin/bash
+
+#  .githooks/pre-commit
+#  s-buffer
+#
+#  Created by Emre Akı on 2026-03-05.
+#
+#  SYNOPSIS:
+#      Runs the test suite before allowing a commit to proceed.
+
+cd "$(dirname "$0")"
+
+SCRIPT_ROOT="$(pwd -P)"
+PROJ_ROOT="$SCRIPT_ROOT/.."
+
+echo "🧪 Running pre-commit test suite..."
+"$PROJ_ROOT/tests/run.sh"
+RESULT=$?
+
+if [[ $RESULT -ne 0 ]]; then
+    echo ""
+    echo "❌ Tests failed (exit code: $RESULT). Commit aborted."
+    echo "Use 'git commit --no-verify' to bypass if absolutely necessary."
+    exit 1
+fi

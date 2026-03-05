@@ -1,5 +1,5 @@
 /*
- *  prepop.c
+ *  s_prepop.h
  *  s-buffer
  *
  *  Created by Emre Akı on 2025-09-12.
@@ -9,8 +9,19 @@
  *      various scenarios
  */
 
-#include "demodef.h"
-#include "prepop.h"
+#ifndef s_prepop_h
+
+#include "shared/s_helpers.h"
+
+#define s_prepop_h
+#define s_prepop_h_TEST_CASES TEST_CASES
+
+#define N_CASES 16
+
+typedef struct {
+    const seg2_t* segs;
+    const size_t  segs_count;
+} test_case_t;
 
 /* [✅] 0. FP precision causing infinitely pushing issue */
 static const seg2_t tc0[7] = {
@@ -563,3 +574,5 @@ const test_case_t TEST_CASES[N_CASES] = {
     { tc14, 98 /* 97 */ },
     { tc15, 129 }
 };
+
+#endif

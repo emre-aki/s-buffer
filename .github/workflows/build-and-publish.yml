@@ -20,12 +20,15 @@ jobs:
           sudo apt update
           sudo apt install -y build-essential
 
-      # Step 3: Build the shared library
-      - name: Build Shared Library
-        run: |
-          ./build.sh
+      # Step 3: Run the test suite
+      - name: Run the test suite
+        run: ./tests/run.sh
 
-      # Step 4: Upload the shared library build artifact
+      # Step 4: Build the shared library
+      - name: Build Shared Library
+        run: ./build.sh
+
+      # Step 5: Upload the shared library build artifact
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:

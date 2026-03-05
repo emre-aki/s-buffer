@@ -18,7 +18,8 @@
 #include <SDL2/SDL.h>
 
 #include "demodef.h"
-#include "prepop.h"
+#include "shared/s_helpers.h"
+#include "shared/s_prepop.h"
 #define S_BUFFER_DEFS_ONLY
 #include "s_buffer.h"
 
@@ -83,19 +84,6 @@ int FastAbs (int x)
     const int sign_mask = x >> 31;
 
     return (x ^ sign_mask) + (1 & sign_mask);
-}
-
-float ZToScreenSpace (int z)
-{
-    return 1.0f / (WIN_H - z);
-}
-
-void ToScreenSpace (const vec2_t* in, float* out)
-{
-    const vec2_t eye = { BUFFER_W_2, WIN_H };
-    const int view_x = in->x - eye.x, view_y = eye.y - in->y;
-    float screen_x = (float) view_x * Z_NEAR / view_y;
-    *out = screen_x + BUFFER_W_2;
 }
 
 SDL_Window*
@@ -648,20 +636,19 @@ Update
         /* store the segment in the s-buffer for any potential clipping to take
          * place appropriately
          */
-        float screen_src, screen_dst;
-        ToScreenSpace(&seg.src, &screen_src);
-        ToScreenSpace(&seg.dst, &screen_dst);
+        float screen_src = S_ToScreenSpace(&seg.src, BUFFER_W_2, WIN_H, Z_NEAR);
+        float screen_dst = S_ToScreenSpace(&seg.dst, BUFFER_W_2, WIN_H, Z_NEAR);
         /* sort the endpoints in ascending screen space x before pushing the
          * segment onto the buffer
          */
         float screen_x0, screen_x1, screen_w0, screen_w1;
         const byte_t src_min = screen_src <= screen_dst;
         screen_x0 = src_min * screen_src + !src_min * screen_dst;
-        screen_w0 = src_min * ZToScreenSpace(seg.src.y) +
-                    !src_min * ZToScreenSpace(seg.dst.y);
+        screen_w0 = src_min * S_ZToScreenSpace(seg.src.y, WIN_H) +
+                    !src_min * S_ZToScreenSpace(seg.dst.y, WIN_H);
         screen_x1 = src_min * screen_dst + !src_min * screen_src;
-        screen_w1 = src_min * ZToScreenSpace(seg.dst.y) +
-                    !src_min * ZToScreenSpace(seg.src.y);
+        screen_w1 = src_min * S_ZToScreenSpace(seg.dst.y, WIN_H) +
+                    !src_min * S_ZToScreenSpace(seg.src.y, WIN_H);
 
 #ifdef SB_DEBUG
         printf("{ { %d, %d }, { %d, %d }, %d }\n",
@@ -712,7 +699,6 @@ Update
     FrameFlush(ctx, frame);
 }
 
-/* WARNING: For debugging use only! */
 void
 Prepopulate
 ( sbuffer_t* sbuffer,
@@ -726,9 +712,8 @@ Prepopulate
     {
         const seg2_t seg = *(tc->segs + i);
         *(segs + i) = seg;
-        float screen_src, screen_dst;
-        ToScreenSpace(&seg.src, &screen_src);
-        ToScreenSpace(&seg.dst, &screen_dst);
+        float screen_src = S_ToScreenSpace(&seg.src, BUFFER_W_2, WIN_H, Z_NEAR);
+        float screen_dst = S_ToScreenSpace(&seg.dst, BUFFER_W_2, WIN_H, Z_NEAR);
         float screen_x0, screen_x1, screen_w0, screen_w1;
         const byte_t src_min = screen_src <= screen_dst;
 
@@ -736,11 +721,11 @@ Prepopulate
          * segment onto the buffer
          */
         screen_x0 = src_min * screen_src + !src_min * screen_dst;
-        screen_w0 = src_min * ZToScreenSpace(seg.src.y) +
-                    !src_min * ZToScreenSpace(seg.dst.y);
+        screen_w0 = src_min * S_ZToScreenSpace(seg.src.y, WIN_H) +
+                    !src_min * S_ZToScreenSpace(seg.dst.y, WIN_H);
         screen_x1 = src_min * screen_dst + !src_min * screen_src;
-        screen_w1 = src_min * ZToScreenSpace(seg.dst.y) +
-                    !src_min * ZToScreenSpace(seg.src.y);
+        screen_w1 = src_min * S_ZToScreenSpace(seg.dst.y, WIN_H) +
+                    !src_min * S_ZToScreenSpace(seg.src.y, WIN_H);
 
         SB_Push(sbuffer,
                 screen_x0, screen_x1,

@@ -301,6 +301,30 @@ static byte_t SB_VerifyHealth (const sbuffer_t* sbuffer)
 
     return 0;
 }
+
+//
+// SB_VerifySpan
+// Verify structural invariants of a single span.
+//
+// Returns a non-zero value if the span is properly balanced, has a correctly
+// assigned height, and is healthy; returns `0` otherwise.
+//
+static byte_t SB_VerifySpan (const span_t* span)
+{
+    byte_t out; // unused -- only in the interest of calling `_SB_VerifyHeights`
+    if (_SB_VerifyHeights(span, &out) != span->height) return 0;
+
+    const int balance_factor = SB_BF(span);
+    if (balance_factor < -1 || balance_factor > 1) return 0;
+
+    if (span->x0 >= span->x1) return 0;
+    if (span->prev && (span->x0 <= span->prev->x0 || span->x0 < span->prev->x1))
+        return 0;
+    if (span->next && (span->x0 >= span->next->x0 || span->x1 > span->next->x0))
+        return 0;
+
+    return 1;
+}
 #endif // SB_DEBUG
 
 //
@@ -1354,8 +1378,16 @@ void SB_Dump (const sbuffer_t* sbuffer)
                 printf(SB_REPR_ARM1);
             }
 
-            printf("[%c] [BF=%d] [H=%d] [%.3f, %.3f)\n",
-                   curr->id, SB_BF(curr), curr->height, curr->x0, curr->x1);
+            byte_t highlight_unhealthy_span = 0;
+#ifdef SB_DEBUG
+            highlight_unhealthy_span = !SB_VerifySpan(curr);
+#endif
+            if (highlight_unhealthy_span)
+                printf("\x1b[31m [%c] [BF=%d] [H=%d] [%.3f, %.3f) \x1b[0m\n",
+                       curr->id, SB_BF(curr), curr->height, curr->x0, curr->x1);
+            else
+                printf("[%c] [BF=%d] [H=%d] [%.3f, %.3f)\n",
+                       curr->id, SB_BF(curr), curr->height, curr->x0, curr->x1);
         }
 
         if (!cp && curr->prev)
