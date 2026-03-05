@@ -767,7 +767,7 @@ SB_Push
     /* initialize the push-stack to store the local scope for each "recursive"
      * stride
      */
-    pscope_t stack[sbuffer->max_depth + 1];
+    pscope_t stack[sbuffer->max_depth];
     int depth = 0; // stack pointer: how deep into the tree we currently are
 
     /* continue pushing in sub-segments unless there's nothing left to insert */
