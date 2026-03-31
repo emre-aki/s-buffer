@@ -93,8 +93,8 @@ int main ()
         const int success = RunTestCase(TEST_CASES + i);
         failcount += 1 & !success;
 
-        if (success) printf("[test] ✅ Case %d/%d passed\n", i + 1, N_CASES);
-        else printf("[test] ❌ Case %d/%d failed\n", i + 1, N_CASES);
+        if (success) printf("[test] ✅ Case %lu/%d passed\n", i + 1, N_CASES);
+        else printf("[test] ❌ Case %lu/%d failed\n", i + 1, N_CASES);
     }
 
     if (failcount)
