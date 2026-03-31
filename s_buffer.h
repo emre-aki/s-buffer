@@ -84,6 +84,9 @@
 #ifndef s_buffer_h
 
 #include <stdlib.h>
+// FIXME: Only dependency is `ceil()' - consider adding a custom implementation
+// to drop `math.h'
+#include <math.h>
 
 #define s_buffer_h
 #define s_buffer_h_span_t span_t
