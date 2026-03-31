@@ -53,6 +53,10 @@
  *
  *          SB_Print(sbuffer); // `_' denotes empty pixels
  *
+ *      Lifetime
+ *
+ *          SB_Destroy(sbuffer); // Releases all memory owned by the buffer
+ *
  *  DEBUGGING:
  *      The contents of the buffer can be dumped in a tree-like structure for
  *      inspection.
@@ -71,9 +75,6 @@
  *           └─[C] [BF=0] [H=1] [6.200, 7.400)
  *              ├─[B] [BF=0] [H=0] [5.000, 6.200)
  *              └─[B] [BF=0] [H=0] [7.400, 8.000)
- *
- *  LIFETIME:
- *      SB_Destroy(sbuffer); // Releases all memory owned by the buffer
  *
  *  AUTHOR:
  *      Emre Akı <aki.emre@icloud.com>
@@ -281,7 +282,7 @@ static byte_t SB_VerifyHealth (const sbuffer_t* sbuffer)
     {
         curr = *(queue + head);
 
-        if (curr->x0 >= curr->x1) return 0x1; // parent has non-positive length
+        if (curr->x0 >= curr->x1) return 0x1; // parent has non-positive width
 
         if (curr->next)
         {
@@ -305,28 +306,37 @@ static byte_t SB_VerifyHealth (const sbuffer_t* sbuffer)
     return 0;
 }
 
+#define SB_INVARIANT_VIOLATION_REASON_HEIGHT "height"
+#define SB_INVARIANT_VIOLATION_REASON_BALANCE_FACTOR "balance factor"
+#define SB_INVARIANT_VIOLATION_REASON_WIDTH "width"
+#define SB_INVARIANT_VIOLATION_REASON_PROTRUDE_LEFT "left-protruding"
+#define SB_INVARIANT_VIOLATION_REASON_PROTRUDE_RIGHT "right-protruding"
+
 //
 // SB_VerifySpan
 // Verify structural invariants of a single span.
 //
-// Returns a non-zero value if the span is properly balanced, has a correctly
-// assigned height, and is healthy; returns `0` otherwise.
+// Returns a human-readable description of the invariant violation if the span
+// is unhealthy; returns `0` otherwise.
 //
-static byte_t SB_VerifySpan (const span_t* span)
+static const byte_t* SB_VerifySpan (const span_t* span)
 {
     byte_t out; // unused -- only in the interest of calling `_SB_VerifyHeights`
-    if (_SB_VerifyHeights(span, &out) != span->height) return 0;
+    if (_SB_VerifyHeights(span, &out) != span->height)
+        return SB_INVARIANT_VIOLATION_REASON_HEIGHT;
 
     const int balance_factor = SB_BF(span);
-    if (balance_factor < -1 || balance_factor > 1) return 0;
+    if (balance_factor < -1 || balance_factor > 1)
+        return SB_INVARIANT_VIOLATION_REASON_BALANCE_FACTOR;
 
-    if (span->x0 >= span->x1) return 0;
+    if (span->x0 >= span->x1)
+        return SB_INVARIANT_VIOLATION_REASON_WIDTH;
     if (span->prev && (span->x0 <= span->prev->x0 || span->x0 < span->prev->x1))
-        return 0;
+        return SB_INVARIANT_VIOLATION_REASON_PROTRUDE_LEFT;
     if (span->next && (span->x0 >= span->next->x0 || span->x1 > span->next->x0))
-        return 0;
+        return SB_INVARIANT_VIOLATION_REASON_PROTRUDE_RIGHT;
 
-    return 1;
+    return 0;
 }
 #endif // SB_DEBUG
 
@@ -1381,16 +1391,22 @@ void SB_Dump (const sbuffer_t* sbuffer)
                 printf(SB_REPR_ARM1);
             }
 
-            byte_t highlight_unhealthy_span = 0;
+            const byte_t* invariant_violation_reason = 0;
 #ifdef SB_DEBUG
-            highlight_unhealthy_span = !SB_VerifySpan(curr);
+            invariant_violation_reason = SB_VerifySpan(curr);
 #endif
-            if (highlight_unhealthy_span)
-                printf("\x1b[31m [%c] [BF=%d] [H=%d] [%.3f, %.3f) \x1b[0m\n",
+            if (invariant_violation_reason)
+            {
+                printf("\x1b[31m [%c] [BF=%d] [H=%d] [%.3f, %.3f) \x1b[0m",
                        curr->id, SB_BF(curr), curr->height, curr->x0, curr->x1);
+
+                printf("(reason: %s)\n", invariant_violation_reason);
+            }
             else
+            {
                 printf("[%c] [BF=%d] [H=%d] [%.3f, %.3f)\n",
                        curr->id, SB_BF(curr), curr->height, curr->x0, curr->x1);
+            }
         }
 
         if (!cp && curr->prev)
