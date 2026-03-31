@@ -121,6 +121,8 @@
 
 #define SB_MAX(a, b) ((((a) > (b)) * (a)) + (((b) >= (a)) * (b)))
 
+#define SB_MIN(a, b) ((((a) < (b)) * (a)) + (((b) <= (a)) * (b)))
+
 #define SB_LERP(a, b, p, t) (((b) - (a)) * (float) (p) / (t) + (a))
 
 #define SB_BF(n) (((n)->next ? ((n)->next->height + 1) : 0) - \
@@ -777,15 +779,14 @@ SB_Push
     if (!curr)
     {
         // clip the segment from left
-        const float clipleft = SB_MAX(-x0, 0);
+        const float new_x0 = SB_MAX(x0, 0);
         // ...and right
-        const float clipright = SB_MAX(x1 - sbuffer->size, 0);
-        const float clipped_size = size - clipright - clipleft;
+        const float new_x1 = SB_MIN(x1, sbuffer->size);
+        const float clipped_size = new_x1 - new_x0;
 
         /* only insert if there's something left to insert */
         if (clipped_size > 0)
         {
-            const float new_x0 = x0 + clipleft, new_x1 = new_x0 + clipped_size;
             const float new_w0 = SB_LERP(w0, w1, new_x0 - x0, size);
             const float new_w1 = SB_LERP(w0, w1, new_x1 - x0, size);
             sbuffer->root = SB_Span(new_x0, new_x1, new_w0, new_w1, id, color);
@@ -1088,10 +1089,11 @@ SB_Push
         /* we should have found an appropriate spot to insert by now */
 
         // clip the current sub-segment from left
-        const float clipleft = SB_MAX(left - x, 0);
+        const float new_x0 = SB_MAX(x, left);
         // ...and right
-        const float clipright = SB_MAX(x + remaining - right, 0);
-        const float clipped_size = remaining - clipleft - clipright;
+        const float new_x1 = SB_MIN(x1, right);
+        const float clipped_size = new_x1 - new_x0;
+        const float clipright = SB_MAX(x1 - right , 0);
 
         /* only insert if there's something left to insert -- this lower bound
          * can be relaxed even further since the buffer has no sub-pixel
@@ -1099,7 +1101,6 @@ SB_Push
          */
         if (clipped_size > 1e-3) // to hell with the floating-point errors --
         {                        // i'm this close to losing it 👌
-            const float new_x0 = x + clipleft, new_x1 = new_x0 + clipped_size;
             const float new_w0 = SB_LERP(w0, w1, new_x0 - x0, size);
             const float new_w1 = SB_LERP(w0, w1, new_x1 - x0, size);
             curr = SB_Span(new_x0, new_x1, new_w0, new_w1, id, color);
