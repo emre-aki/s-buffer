@@ -41,12 +41,12 @@ rm -rfv "$DIST_ROOT"
 mkdir "$DIST_ROOT"
 
 if [[ -z $SB_DEBUG ]]; then
-    gcc -c $SB_VERBOSE ./s_buffer.c -o ./s_buffer.o -fPIC -v &&  \
-    gcc -shared ./s_buffer.o -o "$DIST_ROOT/libsbuffer.so" -v && \
+    gcc -c $SB_VERBOSE ./s_buffer.c -o ./s_buffer.o -fPIC -v &&      \
+    gcc -shared ./s_buffer.o -o "$DIST_ROOT/libsbuffer.so" -lm -v && \
     rm -rf ./s_buffer.o
 else
     gcc -shared $SB_DEBUG $SB_VERBOSE \
         ./s_buffer.c                  \
         -o "$DIST_ROOT/libsbuffer.so" \
-        -fPIC -v -g
+        -lm -fPIC -v -g
 fi
