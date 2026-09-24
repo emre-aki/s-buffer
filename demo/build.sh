@@ -79,11 +79,12 @@ if [[ -z $SB_DEBUG ]]; then
     gcc ./*.c -o ./sbuffer-demo -I../ -L../dist -lsbuffer    \
                                 -I./vendor/SDL2/dist/include \
                                 -L./vendor/SDL2/dist/lib     \
-                                -lSDL2
+                                -lSDL2                       \
+                                $SB_VERBOSE
 else
     gcc ./*.c -o ./sbuffer-demo -I../ -L../dist -lsbuffer    \
                                 -I./vendor/SDL2/dist/include \
                                 -L./vendor/SDL2/dist/lib     \
                                 -lSDL2                       \
-                                -DSB_DEBUG -g
+                                -DSB_DEBUG -g $SB_VERBOSE
 fi
