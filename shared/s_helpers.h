@@ -12,7 +12,6 @@
 #ifndef s_helpers_h
 
 #define S_BUFFER_DEFS_ONLY
-#include "s_buffer.h"
 
 #define s_helpers_h
 #define s_helpers_h_color_t color_t

@@ -11,6 +11,8 @@
 
 #ifndef s_prepop_h
 
+#include <stddef.h>
+
 #include "shared/s_helpers.h"
 
 #define s_prepop_h
