@@ -308,6 +308,8 @@ static byte_t SB_VerifyHealth (const sbuffer_t* sbuffer)
     return 0;
 }
 
+#define SB_BYTESTR(str) ((byte_t*) (str))
+
 #define SB_INVARIANT_VIOLATION_REASON_HEIGHT "height"
 #define SB_INVARIANT_VIOLATION_REASON_BALANCE_FACTOR "balance factor"
 #define SB_INVARIANT_VIOLATION_REASON_WIDTH "width"
@@ -325,18 +327,18 @@ static const byte_t* SB_VerifySpan (const span_t* span)
 {
     byte_t out; // unused -- only in the interest of calling `_SB_VerifyHeights`
     if (_SB_VerifyHeights(span, &out) != span->height)
-        return SB_INVARIANT_VIOLATION_REASON_HEIGHT;
+        return SB_BYTESTR(SB_INVARIANT_VIOLATION_REASON_HEIGHT);
 
     const int balance_factor = SB_BF(span);
     if (balance_factor < -1 || balance_factor > 1)
-        return SB_INVARIANT_VIOLATION_REASON_BALANCE_FACTOR;
+        return SB_BYTESTR(SB_INVARIANT_VIOLATION_REASON_BALANCE_FACTOR);
 
     if (span->x0 >= span->x1)
-        return SB_INVARIANT_VIOLATION_REASON_WIDTH;
+        return SB_BYTESTR(SB_INVARIANT_VIOLATION_REASON_WIDTH);
     if (span->prev && (span->x0 <= span->prev->x0 || span->x0 < span->prev->x1))
-        return SB_INVARIANT_VIOLATION_REASON_PROTRUDE_LEFT;
+        return SB_BYTESTR(SB_INVARIANT_VIOLATION_REASON_PROTRUDE_LEFT);
     if (span->next && (span->x0 >= span->next->x0 || span->x1 > span->next->x0))
-        return SB_INVARIANT_VIOLATION_REASON_PROTRUDE_RIGHT;
+        return SB_BYTESTR(SB_INVARIANT_VIOLATION_REASON_PROTRUDE_RIGHT);
 
     return 0;
 }
