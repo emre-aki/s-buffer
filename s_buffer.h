@@ -420,19 +420,22 @@ SB_Intersect2D
     const float numer_q = SB_CROSS_SPAN2(&c_a, &u);
     const float denom = SB_CROSS_SPAN2(&u, &v);
 
-    const byte_t nonzero_numer = !(SB_Falmeq(numer_t, 0, DEGENERACY_EPS) ||
-                                   SB_Falmeq(numer_q, 0, DEGENERACY_EPS));
-    const byte_t nonzero_denom = !SB_Falmeq(denom, 0, DEGENERACY_EPS);
+    const byte_t nonzero_numer = !(SB_Falmeq(numer_t, 0) ||
+                                   SB_Falmeq(numer_q, 0));
+    const byte_t nonzero_denom = !SB_Falmeq(denom, 0);
     if (!(nonzero_numer || nonzero_denom)) return SB_DEGENERATE;
-    if (nonzero_numer && !nonzero_denom) return SB_PARALLEL;
+    if (!nonzero_denom) return SB_PARALLEL;
     if (!nonzero_numer) return SB_NOT_INTERSECTING;
 
     const float denom_ = 1 / denom;
     const float t = numer_t * denom_, q = numer_q * denom_;
 
-    // TODO: maybe use `Falmeq` here as well?
     if (t <= SB_EPS || t >= 1 - SB_EPS || q <= SB_EPS || q >= 1 - SB_EPS)
         return SB_NOT_INTERSECTING;
+
+    // TODO: might as well compare intersection points reconstructed through
+    // both `t` and `q` paths to reject" false positives caused by
+    // floating-point round-off errors
 
     out->x = t * u.x + a.x;
     out->z = t * u.z + a.z;
@@ -446,14 +449,16 @@ SB_Intersect2D
 // the result in the `out` variable as screen space x if they intersect. A
 // non-zero return value indicates that the spans are not intersecting.
 //   - 0x1: The spans are parallel to one another
-//   - 0x2: The two spans are identical, either in the same direction or
+//   - 0x2: The two spans are collinear, either in the same direction or
 //          opposing directions
 //   - 0x3: The spans are not intersecting
 //
-// The function also stores whether the former span originates from or lies on
-// the left (i.e., in front) of the point of intersection in the `leftness`
-// argument passed. A negative value for `leftness` can be interpreted as
-// truthy.
+// The function also stores whether the former span lies to the left (i.e., in
+// front) of the point of intersection in the `leftness` argument passed, if
+// there happens to be one. Otherwise, `leftness` reports whether the former
+// span is to the left of (i.e., obscured by) the latter when they do not
+// intersect.
+// A negative value for `leftness` can be interpreted as truthy.
 //
 // The input vertices are all in perspective-correct screen space.
 //
