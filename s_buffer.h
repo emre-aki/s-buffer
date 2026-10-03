@@ -449,8 +449,7 @@ SB_Intersect2D
 // the result in the `out` variable as screen space x if they intersect. A
 // non-zero return value indicates that the spans are not intersecting.
 //   - 0x1: The spans are parallel to one another
-//   - 0x2: The two spans are collinear, either in the same direction or
-//          opposing directions
+//   - 0x2: The spans are considered collinear, regardless of orientation
 //   - 0x3: The spans are not intersecting
 //
 // The function also stores whether the former span lies to the left (i.e., in

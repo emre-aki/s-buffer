@@ -41,7 +41,7 @@ For this option, you'd need `gcc` installed on your system.
 After cloning the repository, navigate to its root folder and run the following
 command.
 
-```shell
+```sh
 $ ./build.sh
 ```
 
@@ -49,8 +49,8 @@ This should spit out the binary `libsbuffer.so` which you can dynamically link
 against at runtime for further use — an example of which using `gcc` would look
 something like this:
 
-```shell
-$ gcc ./your_program.c -o ./your-executable \
+```sh
+$ gcc ./your_program.c -o ./your-executable          \
       -I/path/to/the/directory/containing/s_buffer.h \
       -L/path/to/the/directory/containing/libsbuffer.so -lsbuffer
 
@@ -171,7 +171,8 @@ The project also comes with an interactive demo application serving both as a
 testing ground for the implementation, and a simple visual demonstration of the
 algorithm in action.
 
-For instructions on how you can build and run the demo app, see [here](./demo/README.md).
+For instructions on how you can build and run the demo app, see
+[here](./demo/README.md).
 
 [^1]: The terms "near-clipping plane", "buffer", and "S-Buffer" can be used
       interchangeably.

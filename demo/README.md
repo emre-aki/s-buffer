@@ -24,7 +24,7 @@ conveniently included as a submodule in the project. To build SDL2 and s-buffer
 as dynamic libraries and link them against the application, run the following
 command from the project root.
 
-```bash
+```sh
 $ ./demo/build.sh
 ```
 
@@ -40,7 +40,7 @@ $ ./demo/build.sh
 
 This should give you the executable `sbuffer-demo` that launches the demo app.
 
-```bash
+```sh
 $ ./demo/sbuffer-demo
 ```
 

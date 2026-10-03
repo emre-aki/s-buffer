@@ -433,7 +433,7 @@ static const seg2_t tc14[104 /* 98 */] = {
     ///////////////////////////////////////////
 };
 
-/* [☠️] 15. Segfault caused by floating-point precision! */
+/* [✅] 15. Segfault caused by floating-point precision! */
 static const seg2_t tc15[129] = {
     { { 192, 192 }, { 688, 144 }, 1628178431 },
     { { 160, 416 }, { 432, 80 }, 1364322303 },
